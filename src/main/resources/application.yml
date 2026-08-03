@@ -1,0 +1,14 @@
+server:
+  port: 520
+
+spring:
+  application:
+    name: chatgpt-memory-exporter
+
+chat:
+  session:
+    split-interval-hours: 4
+  parser:
+    retain-roles:
+      - user
+      - assistant
