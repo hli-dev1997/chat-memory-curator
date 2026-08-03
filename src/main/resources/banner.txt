@@ -1,0 +1,16 @@
+${AnsiColor.BRIGHT_CYAN}${AnsiStyle.BOLD}
+   ______ __  ______ _____ _____ _____  ______
+  / ____// / / / __ // ___// ___//_  __/ / __  /
+ / /    / /_/ / /_/ / /__ / /__   / /   / /_/ / 
+/ /___ / __  / __  / ___// ___/  / /   / ____/  
+\____//_/ /_/_/ /_/_/   /_/     /_/   /_/       
+${AnsiColor.BRIGHT_BLUE}
+   __  ___                                   ______                     _           
+  /  |/  /__ __ _  ___  ______  __  __  ____/ ____/  _____  ___  _______/ /____  _____
+ / /|_/ / _ `/  ' \/ _ \/ __/ \/ /_/ / /___/ __/ | |/ / _ \/ _ \/ __/ __/ __/ _ \/ ___/
+/ /  / /  __/ /// / // / /  / / / /_/ /   / /___ >  </  __/ // / / / /_/ /_/  __/ /    
+/_/  /_/\___/_//_/\___/_/  /_/  \__, /   /_____/_/\_/\___/\___/_/  \__/\__/\___/_/     
+                               /____/                                                  
+${AnsiColor.BRIGHT_BLUE}================================================================================================${AnsiColor.DEFAULT}
+ ${AnsiColor.BRIGHT_YELLOW}⚡ ChatGPT Memory Exporter ${AnsiColor.DEFAULT}| ${AnsiColor.BRIGHT_GREEN}v1.0.0-SNAPSHOT${AnsiColor.DEFAULT} | ${AnsiColor.CYAN}Spring Boot ${spring-boot.version}${AnsiColor.DEFAULT} | ${AnsiColor.BRIGHT_MAGENTA}Port: 520${AnsiColor.DEFAULT}
+${AnsiColor.BRIGHT_BLUE}================================================================================================${AnsiColor.DEFAULT}

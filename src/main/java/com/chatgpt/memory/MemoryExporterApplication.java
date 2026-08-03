@@ -1,6 +1,7 @@
 package com.chatgpt.memory;
 
 import lombok.extern.slf4j.Slf4j;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -15,6 +16,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author Antigravity
  */
 @Slf4j
+@MapperScan("com.chatgpt.memory.mapper")
 @SpringBootApplication
 public class MemoryExporterApplication {
 
@@ -28,4 +30,3 @@ public class MemoryExporterApplication {
         log.info("MemoryExporterApplication started successfully.");
     }
 }
-

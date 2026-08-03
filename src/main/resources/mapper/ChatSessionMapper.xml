@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chatgpt.memory.mapper.ChatSessionMapper">
+
+    <resultMap id="BaseResultMap" type="com.chatgpt.memory.model.entity.ChatSessionDO">
+        <id property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="source" column="source" />
+        <result property="platform" column="platform" />
+        <result property="sessionId" column="session_id" />
+        <result property="parentConversationId" column="parent_conversation_id" />
+        <result property="title" column="title" />
+        <result property="messageCount" column="message_count" />
+        <result property="startTime" column="start_time" />
+        <result property="endTime" column="end_time" />
+        <result property="sessionJson" column="session_json" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <update id="createTableIfNotExists">
+        CREATE TABLE IF NOT EXISTS `chat_session` (
+          `id`                     BIGINT       NOT NULL AUTO_INCREMENT COMMENT '自增主键 ID',
+          `user_id`                VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '用户 ID / 工号 (如 EMP001)',
+          `source`                 VARCHAR(32)  NOT NULL DEFAULT 'CHATGPT' COMMENT '数据源头 AI 模型/厂商 (CHATGPT, GEMINI, CLAUDE, KIMI 等)',
+          `platform`               VARCHAR(32)  NOT NULL DEFAULT 'WEB' COMMENT '终端/客户端平台 (WEB-网页端, IDE-编辑器插件, APP-移动端 等)',
+          `session_id`             VARCHAR(128) NOT NULL COMMENT '会话片段唯一标识 (全平台通用 UUID/ID)',
+          `parent_conversation_id` VARCHAR(128) NOT NULL COMMENT '所属原始对话 ID (关联父框框)',
+          `title`                  VARCHAR(255) NOT NULL DEFAULT '' COMMENT '对话标题 (方便列表检索与模糊匹配)',
+          `message_count`          INT          NOT NULL DEFAULT 0 COMMENT '本片段包含的消息总条数',
+          `start_time`             DATETIME     NOT NULL COMMENT '本片段起始消息发送时间',
+          `end_time`               DATETIME     NOT NULL COMMENT '本片段结束消息发送时间',
+          `session_json`           JSON         NOT NULL COMMENT '全量 JSON 文本 (存储本片段所有的 ChatMessage 列表，原生 JSON 类型支持 SQL 提取)',
+          `create_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间 (阿里规约必备)',
+          `update_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间 (阿里规约必备)',
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `uk_session_id` (`session_id`),
+          KEY `idx_user_id` (`user_id`),
+          KEY `idx_source` (`source`),
+          KEY `idx_platform` (`platform`),
+          KEY `idx_parent_conv_id` (`parent_conversation_id`),
+          KEY `idx_start_time` (`start_time`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='多平台通用逻辑会话片段表';
+    </update>
+
+    <update id="addColumnUserIdIfNotExists">
+        ALTER TABLE `chat_session` ADD COLUMN `user_id` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '用户 ID / 工号' AFTER `id`;
+    </update>
+
+    <update id="addColumnSourceIfNotExists">
+        ALTER TABLE `chat_session` ADD COLUMN `source` VARCHAR(32) NOT NULL DEFAULT 'CHATGPT' COMMENT '数据源头 AI 模型/厂商' AFTER `user_id`;
+    </update>
+
+    <update id="addColumnPlatformIfNotExists">
+        ALTER TABLE `chat_session` ADD COLUMN `platform` VARCHAR(32) NOT NULL DEFAULT 'WEB' COMMENT '终端/客户端平台' AFTER `source`;
+    </update>
+
+    <update id="modifyColumnSessionJsonToJson">
+        ALTER TABLE `chat_session` MODIFY COLUMN `session_json` JSON NOT NULL COMMENT '全量 JSON 文本 (原生 JSON 类型支持 SQL 提取)';
+    </update>
+
+    <insert id="upsert" parameterType="com.chatgpt.memory.model.entity.ChatSessionDO">
+        INSERT INTO `chat_session` (
+            `user_id`, `source`, `platform`, `session_id`, `parent_conversation_id`, `title`, `message_count`, `start_time`, `end_time`, `session_json`
+        ) VALUES (
+            #{userId}, #{source}, #{platform}, #{sessionId}, #{parentConversationId}, #{title}, #{messageCount}, #{startTime}, #{endTime}, #{sessionJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            `user_id`                = VALUES(`user_id`),
+            `source`                 = VALUES(`source`),
+            `platform`               = VALUES(`platform`),
+            `parent_conversation_id` = VALUES(`parent_conversation_id`),
+            `title`                  = VALUES(`title`),
+            `message_count`          = VALUES(`message_count`),
+            `start_time`             = VALUES(`start_time`),
+            `end_time`               = VALUES(`end_time`),
+            `session_json`           = VALUES(`session_json`);
+    </insert>
+
+    <insert id="batchUpsert">
+        INSERT INTO `chat_session` (
+            `user_id`, `source`, `platform`, `session_id`, `parent_conversation_id`, `title`, `message_count`, `start_time`, `end_time`, `session_json`
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.userId}, #{item.source}, #{item.platform}, #{item.sessionId}, #{item.parentConversationId}, #{item.title}, #{item.messageCount}, #{item.startTime}, #{item.endTime}, #{item.sessionJson})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            `user_id`                = VALUES(`user_id`),
+            `source`                 = VALUES(`source`),
+            `platform`               = VALUES(`platform`),
+            `parent_conversation_id` = VALUES(`parent_conversation_id`),
+            `title`                  = VALUES(`title`),
+            `message_count`          = VALUES(`message_count`),
+            `start_time`             = VALUES(`start_time`),
+            `end_time`               = VALUES(`end_time`),
+            `session_json`           = VALUES(`session_json`);
+    </insert>
+
+    <select id="selectBySessionId" resultMap="BaseResultMap">
+        SELECT * FROM `chat_session` WHERE `session_id` = #{sessionId} LIMIT 1;
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(1) FROM `chat_session`;
+    </select>
+
+</mapper>

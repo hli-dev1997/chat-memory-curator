@@ -4,8 +4,27 @@ server:
 spring:
   application:
     name: chatgpt-memory-exporter
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/chat_memory_curator?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: Q836184425
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 10000
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
 chat:
+  user-id: EMP001      # 用户 ID / 工号
+  source: CHATGPT      # 数据源: CHATGPT, GEMINI, CLAUDE, KIMI 等
+  platform: WEB        # 终端平台: WEB (网页端), IDE (编辑器插件), APP (移动端) 等
   session:
     split-interval-hours: 4
   parser:

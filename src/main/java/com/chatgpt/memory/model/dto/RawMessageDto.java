@@ -2,19 +2,28 @@ package com.chatgpt.memory.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
 import java.util.List;
-import java.util.Map;
 
 /**
- * 对应 ChatGPT 导出 JSON 中 mapping 字典节点的原始消息 DTO
+ * 类说明 / Class Description:
+ * 中文：对应 RawNodeDto 节点上挂载的 ChatGPT 原始消息实体。
+ * English: Raw message entity attached to a RawNodeDto node.
  * <p>
- * 包含消息 ID、作者角色、创建与更新时间戳、内容 parts 数组以及消息状态等信息。
- * 遵循《阿里 Java 开发手册》POJO 规范，禁止使用 is 前缀，统一使用包装数据类型。
+ * 设计目的 / Design Purpose:
+ * 中文：用于提取发送者 Author 角色信息、Content 正文片段列表 parts，以及秒级创建时间戳 create_time。
+ * English: Used to extract author role, content parts (strings/audio dicts), and creation timestamps.
  * </p>
+ *
+ * 字段说明 / Field Description:
+ * - id: 消息 UUID
+ * - author: 消息发送者对象
+ * - content: 消息内容对象（包含 parts 列表）
+ * - createTime: 消息发送的时间戳（秒）
  *
  * @author Antigravity
  */
@@ -22,81 +31,51 @@ import java.util.Map;
 @Setter
 @ToString
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Schema(name = "RawMessageDto", description = "ChatGPT 原始消息节点 DTO 实体")
 public class RawMessageDto {
 
-    /**
-     * 消息全局唯一标识 UUID
-     */
+    @Schema(description = "消息全局唯一标识 UUID", example = "b5532e3d-31e5-4217-bf08-4e26d86e3e6d")
     private String id;
 
-    /**
-     * 消息作者与角色信息
-     */
+    @Schema(description = "消息发送者元数据")
     private AuthorDto author;
 
-    /**
-     * 消息创建 Unix 时间戳（单位：秒）
-     */
+    @Schema(description = "消息正文内容容器")
+    private ContentDto content;
+
+    @Schema(description = "消息创建时间戳（单位：秒）", example = "1765644057.564")
     @JsonProperty("create_time")
     private Double createTime;
 
     /**
-     * 消息最后更新 Unix 时间戳（单位：秒）
-     */
-    @JsonProperty("update_time")
-    private Double updateTime;
-
-    /**
-     * 消息正文与多模态内容封装对象
-     */
-    private ContentDto content;
-
-    /**
-     * 消息生成状态（如 finished_successfully）
-     */
-    private String status;
-
-    /**
-     * 消息作者详细属性 DTO
+     * 消息发送者属性实体
      */
     @Getter
     @Setter
     @ToString
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @Schema(name = "AuthorDto", description = "消息发送者角色实体")
     public static class AuthorDto {
-        /**
-         * 角色标识（如 user, assistant, system, tool）
-         */
+
+        @Schema(description = "发送者角色类型（如 user, assistant, system, tool）", example = "user")
         private String role;
-
-        /**
-         * 作者名称（可为 null）
-         */
-        private String name;
-
-        /**
-         * 拓展元数据集合
-         */
-        private Map<String, Object> metadata;
     }
 
     /**
-     * 消息内容封装 DTO
+     * 消息正文属性容器
      */
     @Getter
     @Setter
     @ToString
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @Schema(name = "ContentDto", description = "消息正文 Parts 容器实体")
     public static class ContentDto {
-        /**
-         * 内容类型标识（如 text, user_editable_context, multimodal_text 等）
-         */
+
+        @Schema(description = "消息类型标识", example = "text")
         @JsonProperty("content_type")
         private String contentType;
 
-        /**
-         * 正文片段列表，元素可能为 String 文本，也可能为 Map 字典（如语音转写 audio_transcription）
-         */
+        @Schema(description = "多模态与纯文本 parts 列表（包含纯字符串或带有 text 字段的语音转写字典对象）")
         private List<Object> parts;
     }
 }
