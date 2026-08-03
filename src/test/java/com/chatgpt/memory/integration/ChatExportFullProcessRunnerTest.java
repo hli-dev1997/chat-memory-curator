@@ -7,6 +7,7 @@ import com.chatgpt.memory.service.ChatSessionSplitter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ import java.util.List;
  *
  * @author Antigravity
  */
+@Slf4j
 @SpringBootTest
 class ChatExportFullProcessRunnerTest {
 
@@ -41,27 +43,27 @@ class ChatExportFullProcessRunnerTest {
     void executeFullExportAndSplitting() throws IOException {
         final File htmlFile = new File("E:/data/chatGPT_back/chatGPT导出20251214/chat.html");
         if (!htmlFile.exists()) {
-            System.out.println("❌ 目标文件 chat.html 不存在，请检查路径: " + htmlFile.getAbsolutePath());
+            log.warn("❌ 目标文件 chat.html 不存在，请检查路径: {}", htmlFile.getAbsolutePath());
             return;
         }
 
-        System.out.println("\n====================================================================================================");
-        System.out.println("                     【开始执行 ChatGPT 87.6MB 全量数据提纯与 Session 切分】");
-        System.out.println("====================================================================================================\n");
+        log.info("====================================================================================================");
+        log.info("                     【开始执行 ChatGPT 87.6MB 全量数据提纯与 Session 切分】");
+        log.info("====================================================================================================");
 
         // 1. 全量解析提纯主线对话
         final long startParseTime = System.currentTimeMillis();
         final List<ChatConversation> conversations = parser.parseHtmlFile(htmlFile);
         final long parseCostMs = System.currentTimeMillis() - startParseTime;
 
-        System.out.printf("✅ [1/2] 全量 HTML 解析完成！耗时: %d ms, 提取到主线对话场数: %d 场%n", parseCostMs, conversations.size());
+        log.info("✅ [1/2] 全量 HTML 解析完成！耗时: {} ms, 提取到主线对话场数: {} 场", parseCostMs, conversations.size());
 
         // 2. 全量按时间间隔（默认 4 小时）执行逻辑切分
         final long startSplitTime = System.currentTimeMillis();
         final List<ChatSession> sessions = splitter.splitConversations(conversations);
         final long splitCostMs = System.currentTimeMillis() - startSplitTime;
 
-        System.out.printf("✅ [2/2] 4小时时间间隔切分完成！耗时: %d ms, 产生的逻辑 Session 片段数: %d 个%n", splitCostMs, sessions.size());
+        log.info("✅ [2/2] 4小时时间间隔切分完成！耗时: {} ms, 产生的逻辑 Session 片段数: {} 个", splitCostMs, sessions.size());
 
         // 3. 结果序列化与文件导出
         final ObjectMapper mapper = new ObjectMapper();
@@ -71,17 +73,18 @@ class ChatExportFullProcessRunnerTest {
         // (1) 导出 1,142 场完整对话
         final File convOutputFile = new File("E:/data/chatgpt-memory-exporter/all_extracted_conversations.json");
         mapper.writeValue(convOutputFile, conversations);
-        System.out.printf("%n📦 [文件 1] 全量主线对话 (1,142 场) 已成功导出至: %s (文件大小: %.2f MB)%n",
-                convOutputFile.getAbsolutePath(), convOutputFile.length() / (1024.0 * 1024.0));
+        log.info("📦 [文件 1] 全量主线对话 (1,142 场) 已成功导出至: {} (文件大小: {} MB)",
+                convOutputFile.getAbsolutePath(), String.format("%.2f", convOutputFile.length() / (1024.0 * 1024.0)));
 
         // (2) 导出 1,694 个 4小时切分 Session 片段
         final File sessionOutputFile = new File("E:/data/chatgpt-memory-exporter/all_split_sessions.json");
         mapper.writeValue(sessionOutputFile, sessions);
-        System.out.printf("📦 [文件 2] 全量切分 Session (1,694 个) 已成功导出至: %s (文件大小: %.2f MB)%n",
-                sessionOutputFile.getAbsolutePath(), sessionOutputFile.length() / (1024.0 * 1024.0));
+        log.info("📦 [文件 2] 全量切分 Session (1,694 个) 已成功导出至: {} (文件大小: {} MB)",
+                sessionOutputFile.getAbsolutePath(), String.format("%.2f", sessionOutputFile.length() / (1024.0 * 1024.0)));
 
-        System.out.println("\n====================================================================================================");
-        System.out.println("                          🎉 【全量数据处理完成！准备好进入 Phase 2】");
-        System.out.println("====================================================================================================\n");
+        log.info("====================================================================================================");
+        log.info("                          🎉 【全量数据处理完成！准备好进入 Phase 2】");
+        log.info("====================================================================================================");
     }
 }
+

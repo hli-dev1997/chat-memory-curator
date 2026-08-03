@@ -6,6 +6,7 @@ import com.chatgpt.memory.parser.ChatExportParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import java.util.List;
  *
  * @author Antigravity
  */
+@Slf4j
 @SpringBootTest
 class ChatExportFirst100PrinterTest {
 
@@ -37,7 +39,7 @@ class ChatExportFirst100PrinterTest {
     void printAndExportFirst100Conversations() throws IOException {
         final File htmlFile = new File("E:/data/chatGPT_back/chatGPT导出20251214/chat.html");
         if (!htmlFile.exists()) {
-            System.out.println("chat.html 文件不存在，跳过打印");
+            log.warn("chat.html 文件不存在，跳过打印");
             return;
         }
 
@@ -48,18 +50,19 @@ class ChatExportFirst100PrinterTest {
         final int limit = Math.min(100, allConversations.size());
         final List<ChatConversation> first100 = allConversations.subList(0, limit);
 
-        System.out.println("\n====================================================================================================");
-        System.out.printf("               【前 %d 场完整对话 (ChatConversation) 提纯明细】%n", limit);
-        System.out.println("====================================================================================================\n");
+        log.info("====================================================================================================");
+        log.info("               【前 {} 场完整对话 (ChatConversation) 提纯明细】", limit);
+        log.info("====================================================================================================");
 
         for (int i = 0; i < first100.size(); i++) {
             final ChatConversation conv = first100.get(i);
-            System.out.printf("【对话 %03d / %03d】--------------------------------------------------------------------------------%n", i + 1, limit);
-            System.out.printf("  - 对话 ID   : %s%n", conv.getConversationId());
-            System.out.printf("  - 对话标题 : %s%n", conv.getTitle());
-            System.out.printf("  - 创建时间 : %s%n", DATE_FORMATTER.format(conv.getCreateTime()));
-            System.out.printf("  - 消息条数 : %d 条%n", conv.getMessages().size());
-            System.out.println("  --------------------------------------------------------------------------------------------------");
+            log.info("【对话 {} / {}】--------------------------------------------------------------------------------",
+                    String.format("%03d", i + 1), String.format("%03d", limit));
+            log.info("  - 对话 ID   : {}", conv.getConversationId());
+            log.info("  - 对话标题 : {}", conv.getTitle());
+            log.info("  - 创建时间 : {}", DATE_FORMATTER.format(conv.getCreateTime()));
+            log.info("  - 消息条数 : {} 条", conv.getMessages().size());
+            log.info("  --------------------------------------------------------------------------------------------------");
 
             final List<ChatMessage> msgs = conv.getMessages();
             for (int j = 0; j < msgs.size(); j++) {
@@ -73,10 +76,10 @@ class ChatExportFirst100PrinterTest {
                     cleanContent = cleanContent.substring(0, 150) + "...";
                 }
 
-                System.out.printf("    [%02d] %s (%s):%n", j + 1, roleTag, timeStr);
-                System.out.printf("         \"%s\"%n", cleanContent);
+                log.info("    [{}] {} ({}):", String.format("%02d", j + 1), roleTag, timeStr);
+                log.info("         \"{}\"", cleanContent);
             }
-            System.out.println("----------------------------------------------------------------------------------------------------\n");
+            log.info("----------------------------------------------------------------------------------------------------");
         }
 
         // 3. 将这 100 场完整的结构化对话导出为格式化 JSON 文件供人工查验
@@ -87,6 +90,7 @@ class ChatExportFirst100PrinterTest {
         final File outputFile = new File("E:/data/chatgpt-memory-exporter/extracted_first_100_conversations.json");
         mapper.writeValue(outputFile, first100);
 
-        System.out.printf(">>> [成功] 前 %d 场完整对话已成功导出至 JSON 文件: %s%n", limit, outputFile.getAbsolutePath());
+        log.info(">>> [成功] 前 {} 场完整对话已成功导出至 JSON 文件: {}", limit, outputFile.getAbsolutePath());
     }
 }
+

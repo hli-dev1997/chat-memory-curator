@@ -4,6 +4,7 @@ import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
 import com.chatgpt.memory.service.ChatSessionSplitter;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Slf4j
 @SpringBootTest
 class ChatExportIntegrationTest {
 
@@ -29,6 +31,7 @@ class ChatExportIntegrationTest {
     void testRealChatHtmlParsingAndSplitting() throws IOException {
         final File realHtmlFile = new File("E:/data/chatGPT_back/chatGPT导出20251214/chat.html");
         if (!realHtmlFile.exists()) {
+            log.warn("realHtmlFile file does not exist, skipping test execution");
             return;
         }
 
@@ -37,12 +40,13 @@ class ChatExportIntegrationTest {
         final long parseCostMs = System.currentTimeMillis() - startMs;
 
         assertThat(conversations).isNotEmpty();
-        System.out.printf(">>> [集成测试] 解析 87MB real html 成功！找到对话场数: %d, 耗时: %d ms%n",
+        log.info(">>> [集成测试] 解析 87MB real html 成功！找到对话场数: {}, 耗时: {} ms",
                 conversations.size(), parseCostMs);
 
         final List<ChatSession> sessions = splitter.splitConversations(conversations);
-        System.out.printf(">>> [集成测试] 切分完成！产生逻辑 Session 数: %d%n", sessions.size());
+        log.info(">>> [集成测试] 切分完成！产生逻辑 Session 数: {}", sessions.size());
 
         assertThat(sessions).isNotEmpty();
     }
 }
+

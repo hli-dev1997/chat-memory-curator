@@ -5,6 +5,7 @@ import com.chatgpt.memory.model.ChatMessage;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
 import com.chatgpt.memory.service.ChatSessionSplitter;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import java.util.List;
  *
  * @author Antigravity
  */
+@Slf4j
 @SpringBootTest
 class ChatExportVisualPrinterTest {
 
@@ -40,16 +42,16 @@ class ChatExportVisualPrinterTest {
     void printExtractedConversationDetails() throws IOException {
         final File htmlFile = new File("E:/data/chatGPT_back/chatGPT导出20251214/chat.html");
         if (!htmlFile.exists()) {
-            System.out.println("chat.html 文件不存在，跳过打印");
+            log.warn("chat.html 文件不存在，跳过打印");
             return;
         }
 
         // 1. 解析提纯整份文件
         final List<ChatConversation> conversations = parser.parseHtmlFile(htmlFile);
 
-        System.out.println("\n====================================================================================================");
-        System.out.println("                        【ChatGPT 导出数据提纯与切分可视化样例展示】");
-        System.out.println("====================================================================================================\n");
+        log.info("====================================================================================================");
+        log.info("                        【ChatGPT 导出数据提纯与切分可视化样例展示】");
+        log.info("====================================================================================================");
 
         // 挑选 2 场典型的长对话展示完整的提纯与切分内容（如 Redis集群架构类型 与 虚拟机健康检查）
         int printedCount = 0;
@@ -68,22 +70,22 @@ class ChatExportVisualPrinterTest {
             final List<ChatSession> sessions,
             final int index) {
 
-        System.out.printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>> 【完整对话样例 %d】 <<<<<<<<<<<<<<<<<<<<<<<<<<<<%n", index);
-        System.out.printf("【对话 ID】: %s%n", conv.getConversationId());
-        System.out.printf("【对话标题】: %s%n", conv.getTitle());
-        System.out.printf("【创建时间】: %s%n", DATE_FORMATTER.format(conv.getCreateTime()));
-        System.out.printf("【主线提纯后消息总数】: %d 条%n", conv.getMessages().size());
-        System.out.printf("【4小时切分得到的 Session 数量】: %d 个片段%n", sessions.size());
-        System.out.println("----------------------------------------------------------------------------------------------------\n");
+        log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>> 【完整对话样例 {}】 <<<<<<<<<<<<<<<<<<<<<<<<<<<<", index);
+        log.info("【对话 ID】: {}", conv.getConversationId());
+        log.info("【对话标题】: {}", conv.getTitle());
+        log.info("【创建时间】: {}", DATE_FORMATTER.format(conv.getCreateTime()));
+        log.info("【主线提纯后消息总数】: {} 条", conv.getMessages().size());
+        log.info("【4小时切分得到的 Session 数量】: {} 个片段", sessions.size());
+        log.info("----------------------------------------------------------------------------------------------------");
 
         for (int i = 0; i < sessions.size(); i++) {
             final ChatSession session = sessions.get(i);
-            System.out.printf("  --- [Session 片段 %d / %d] (ID: %s) ---%n", i + 1, sessions.size(), session.getSessionId());
-            System.out.printf("  --- [时间跨度]: %s  ==>  %s (包含 %d 条消息) ---%n",
+            log.info("  --- [Session 片段 {} / {}] (ID: {}) ---", i + 1, sessions.size(), session.getSessionId());
+            log.info("  --- [时间跨度]: {}  ==>  {} (包含 {} 条消息) ---",
                     DATE_FORMATTER.format(session.getStartTime()),
                     DATE_FORMATTER.format(session.getEndTime()),
                     session.getMessages().size());
-            System.out.println("  --------------------------------------------------------------------------------------------------");
+            log.info("  --------------------------------------------------------------------------------------------------");
 
             final List<ChatMessage> msgs = session.getMessages();
             for (int j = 0; j < msgs.size(); j++) {
@@ -97,11 +99,12 @@ class ChatExportVisualPrinterTest {
                     contentPreview = contentPreview.substring(0, 120) + "...";
                 }
 
-                System.out.printf("    [%d.%d] %s (%s):%n", i + 1, j + 1, roleName, timeStr);
-                System.out.printf("          \"%s\"%n%n", contentPreview);
+                log.info("    [{}.{}] {} ({}):", i + 1, j + 1, roleName, timeStr);
+                log.info("          \"{}\"", contentPreview);
             }
-            System.out.println("  --------------------------------------------------------------------------------------------------\n");
+            log.info("  --------------------------------------------------------------------------------------------------");
         }
-        System.out.println("====================================================================================================\n");
+        log.info("====================================================================================================");
     }
 }
+

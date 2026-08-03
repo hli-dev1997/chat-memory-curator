@@ -1,5 +1,6 @@
 package com.chatgpt.memory;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -13,6 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * @author Antigravity
  */
+@Slf4j
 @SpringBootApplication
 public class MemoryExporterApplication {
 
@@ -23,5 +25,7 @@ public class MemoryExporterApplication {
      */
     public static void main(final String[] args) {
         SpringApplication.run(MemoryExporterApplication.class, args);
+        log.info("MemoryExporterApplication started successfully.");
     }
 }
+

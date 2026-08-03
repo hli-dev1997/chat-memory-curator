@@ -29,6 +29,3 @@ replay_pid*
 
 # Maven Build Output
 target/
-
-# Local Data Files
-*.json

@@ -28,7 +28,7 @@ import java.util.Set;
 /**
  * ChatGPT 导出 HTML 数据高效解析器
  * <p>
- * 核心优化：采用轻量级字符串标记定位定位 var jsonData = ，避开 Jsoup 87MB DOM 树构建以提升速度防 OOM。
+ * 核心优化：采用轻量级字符串定位 var jsonData = ，避开 Jsoup 87MB DOM 树构建以提升速度防 OOM。
  * 核心算法：基于 current_node 进行父节点链逆向回溯，提取实际采纳的主线对话分支，自动过滤废弃分支与 system/tool 噪音角色。
  * </p>
  *
@@ -132,7 +132,7 @@ public class ChatExportParser {
             if (!messages.isEmpty()) {
                 createTime = messages.get(0).getCreateTime();
             } else {
-                log.warn("Conversation [{}] create_time and messages are both empty/null, defaulting to current time", rawConv.getId());
+                log.warn("[TIMESTAMP_LEVEL4_FALLBACK] Conversation [{}] create_time and messages are both empty/null, defaulting to current time", rawConv.getId());
                 createTime = Instant.now();
             }
         }
@@ -242,7 +242,7 @@ public class ChatExportParser {
                 msgCreateTime = mainlineMessages.get(mainlineMessages.size() - 1).getCreateTime(); // Level 3: 继承上一条消息的时间戳
             }
             if (msgCreateTime == null) {
-                log.warn("Message [{}] and Conversation [{}] create_time are both null, fallback to current time", rawMsg.getId(), convId);
+                log.warn("[TIMESTAMP_LEVEL4_FALLBACK] Message [{}] in Conversation [{}] triggered final Instant.now() fallback due to all timestamps being null", rawMsg.getId(), convId);
                 msgCreateTime = Instant.now(); // Level 4: 系统当前时间兜底
             }
 
