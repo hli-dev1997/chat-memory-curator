@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: chatgpt-memory-exporter
+  config:
+    import:
+      - optional:classpath:application-secret.yml
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/chat_memory_curator?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
@@ -35,3 +38,11 @@ chat:
     retain-roles:
       - user
       - assistant
+
+qwen:
+  model-name: qwen3.6-flash
+  base-url: https://ws-dzx3vakjj1wmjyha.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+  timeout-seconds: 60
+  log-requests: true
+  log-responses: true
+
