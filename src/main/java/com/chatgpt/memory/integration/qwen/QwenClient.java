@@ -30,16 +30,22 @@ public class QwenClient {
      * 发送单轮用户 Prompt 对话请求
      *
      * @param prompt 用户提示词文本，不可为 null
-     * @return 模型生成的响应字符串
+     * @return 模型生成的响应字符串，非空保证
      */
     public String generate(String prompt) {
         Objects.requireNonNull(prompt, "prompt cannot be null");
         log.debug("Sending user prompt to Qwen: {}", prompt);
 
         Response<AiMessage> response = qwenChatLanguageModel.generate(UserMessage.from(prompt));
+        if (response == null || response.content() == null) {
+            log.warn("Received null response or content from Qwen for prompt: {}", prompt);
+            return "";
+        }
+
         String content = response.content().text();
-        log.debug("Received response from Qwen: {}", content);
-        return content;
+        String result = content != null ? content : "";
+        log.debug("Received response from Qwen: {}", result);
+        return result;
     }
 
     /**
@@ -47,7 +53,7 @@ public class QwenClient {
      *
      * @param systemPrompt 系统提示词文本，不可为 null
      * @param userPrompt   用户提示词文本，不可为 null
-     * @return 模型生成的响应字符串
+     * @return 模型生成的响应字符串，非空保证
      */
     public String generateWithSystem(String systemPrompt, String userPrompt) {
         Objects.requireNonNull(systemPrompt, "systemPrompt cannot be null");
@@ -58,8 +64,14 @@ public class QwenClient {
                 SystemMessage.from(systemPrompt),
                 UserMessage.from(userPrompt)
         );
+        if (response == null || response.content() == null) {
+            log.warn("Received null response or content from Qwen for system and user prompts");
+            return "";
+        }
+
         String content = response.content().text();
-        log.debug("Received response from Qwen: {}", content);
-        return content;
+        String result = content != null ? content : "";
+        log.debug("Received response from Qwen: {}", result);
+        return result;
     }
 }
