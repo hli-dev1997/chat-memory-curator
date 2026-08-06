@@ -4,7 +4,7 @@ import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
 import com.chatgpt.memory.service.ChatSessionDatabaseService;
-import com.chatgpt.memory.service.ChatSessionSplitter;
+import com.chatgpt.memory.service.VectorSessionSplitter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,7 @@ class ChatSessionDatabaseImportIntegrationTest {
     private ChatExportParser parser;
 
     @Autowired
-    private ChatSessionSplitter splitter;
+    private VectorSessionSplitter splitter;
 
     @Autowired
     private ChatSessionDatabaseService databaseService;

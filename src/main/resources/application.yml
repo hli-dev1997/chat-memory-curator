@@ -27,6 +27,10 @@ chat:
   platform: WEB        # 终端平台: WEB (网页端), IDE (编辑器插件), APP (移动端) 等
   session:
     split-interval-hours: 4
+  segmentation:
+    l1-high-threshold: 0.82  # 极严格强相关门限 (>= 0.82 允许直接合并)
+    l1-low-threshold: 0.60   # 跨主题切断门限 (< 0.60 强制打断)
+    short-text-min-length: 30 # 提高短句判定阈值为 30 字，使“那为什么还是不行呢”(9字)等追问自动拼接上文 Chunk
   parser:
     retain-roles:
       - user

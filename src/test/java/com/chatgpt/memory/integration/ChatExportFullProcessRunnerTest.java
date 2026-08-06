@@ -3,7 +3,7 @@ package com.chatgpt.memory.integration;
 import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
-import com.chatgpt.memory.service.ChatSessionSplitter;
+import com.chatgpt.memory.service.VectorSessionSplitter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -21,9 +21,7 @@ import java.util.List;
  * 全量数据提取与会话片段切分全流程运行测试类
  * <p>
  * 运行本测试类可对 e:/data/chatGPT_back/chatGPT导出20251214/chat.html (87.6MB)
- * 执行全量数据提纯与 4 小时 Session 切分，并将结果分别导出为：
- * 1. all_extracted_conversations.json (1,142 场完整主线对话)
- * 2. all_split_sessions.json (1,694 个切分后的逻辑 Session 片段)
+ * 执行全量数据提纯与 BGE 向量 Session 切分。
  * </p>
  *
  * @author Antigravity
@@ -36,7 +34,7 @@ class ChatExportFullProcessRunnerTest {
     private ChatExportParser parser;
 
     @Autowired
-    private ChatSessionSplitter splitter;
+    private VectorSessionSplitter splitter;
 
     @Test
     @DisplayName("运行全量数据提取与 4 小时 Session 切分，导出全量结果文件")

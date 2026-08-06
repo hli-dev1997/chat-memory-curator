@@ -5,7 +5,7 @@ import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
 import com.chatgpt.memory.service.ChatImportFacadeService;
 import com.chatgpt.memory.service.ChatSessionDatabaseService;
-import com.chatgpt.memory.service.ChatSessionSplitter;
+import com.chatgpt.memory.service.VectorSessionSplitter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,26 +26,26 @@ import java.util.Map;
 
 /**
  * 类说明 / Class Description:
- * 中文：ChatGPT 导出数据解析、切分与直存 MySQL 数据库的 REST 控制器。
- * English: REST controller for parsing, splitting, and directly persisting ChatGPT data to MySQL.
+ * 中文：ChatGPT 导出数据解析、BGE 向量语义切分与直存 MySQL 数据库的 REST 控制器。
+ * English: REST controller for parsing, BGE vector segmentation, and direct persistence to MySQL.
  * <p>
  * 设计目的 / Design Purpose:
  * 中文：遵守《阿里巴巴 Java 开发手册（黄山版）》API 规约，提供 OpenAPI 3 / Knife4j Swagger 可视化调试接口。
  * 支持直接指定 HTML 文件一键无磁盘 IO 直存 MySQL 数据库。
  * English: OpenAPI 3 REST controller supporting direct end-to-end import to MySQL database.
  * </p>
-
+ *
  * @author Antigravity
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/chat")
 @RequiredArgsConstructor
-@Tag(name = "ChatExportController", description = "ChatGPT 导出数据解析、逻辑切分与 MySQL 直接落库接口")
+@Tag(name = "ChatExportController", description = "ChatGPT 导出数据解析、BGE 向量语义切分与 MySQL 直接落库接口")
 public class ChatExportController {
 
     private final ChatExportParser chatExportParser;
-    private final ChatSessionSplitter chatSessionSplitter;
+    private final VectorSessionSplitter vectorSessionSplitter;
     private final ChatSessionDatabaseService chatSessionDatabaseService;
     private final ChatImportFacadeService chatImportFacadeService;
 
@@ -53,7 +53,7 @@ public class ChatExportController {
      * 解析并切分 HTML 文件（返回内存列表，不依赖文件导出）
      */
     @GetMapping("/parse-and-split")
-    @Operation(summary = "解析 HTML 文件并进行逻辑 Session 切分", description = "流式解析指定的 ChatGPT 导出 HTML 文件，并按 4 小时阈值切分为 Session 片段列表")
+    @Operation(summary = "解析 HTML 文件并进行 BGE 向量语义切分", description = "流式解析指定的 ChatGPT 导出 HTML 文件，并按 BGE 向量语义切割为 Session 片段列表")
     public ResponseEntity<Map<String, Object>> parseAndSplit(
             @Parameter(description = "导出 HTML 文件绝对路径", example = "E:\\data\\chatGPT_back\\chatGPT导出20251214\\chat.html")
             @RequestParam final String filePath) {
@@ -69,7 +69,7 @@ public class ChatExportController {
 
         try {
             final List<ChatConversation> conversations = chatExportParser.parseHtmlFile(file);
-            final List<ChatSession> sessions = chatSessionSplitter.splitConversations(conversations);
+            final List<ChatSession> sessions = vectorSessionSplitter.splitConversations(conversations);
 
             final Map<String, Object> result = new HashMap<>();
             result.put("code", 200);

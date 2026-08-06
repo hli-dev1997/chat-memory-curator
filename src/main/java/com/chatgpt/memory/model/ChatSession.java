@@ -13,12 +13,12 @@ import java.util.List;
 
 /**
  * 类说明 / Class Description:
- * 中文：经过时间间隔（默认 4 小时阈值）切分后的逻辑会话片段领域实体 POJO。
- * English: Logical chat session fragment POJO split by time interval (default 4h threshold).
+ * 中文：经过 BGE 向量语义切分后的逻辑会话片段领域实体 POJO。
+ * English: Logical chat session fragment POJO split by BGE vector semantic similarity.
  * <p>
  * 设计目的 / Design Purpose:
- * 中文：单场 ChatConversation 可能跨越数天或数个不同话题，
- * 经过 ChatSessionSplitter 按时间间隔切分为多个相对聚焦的 ChatSession，
+ * 中文：单场 ChatConversation 可能包含跨越数个不同话题的讨论，
+ * 经过 VectorSessionSplitter 按 BGE 向量语义余弦相似度切分为多个相对聚焦的 ChatSession，
  * 作为 Phase 2 AI 价值评估与记忆库向量化的最小逻辑处理单元。
  * 支持包含用户 ID userId、数据源 source (CHATGPT, GEMINI) 与终端平台 platform (WEB, IDE)。
  * English: Split long conversations into focused session fragments as minimum units for Phase 2 AI evaluation & vectorization.

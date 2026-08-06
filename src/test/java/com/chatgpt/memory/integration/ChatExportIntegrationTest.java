@@ -3,7 +3,7 @@ package com.chatgpt.memory.integration;
 import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
-import com.chatgpt.memory.service.ChatSessionSplitter;
+import com.chatgpt.memory.service.VectorSessionSplitter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ class ChatExportIntegrationTest {
     private ChatExportParser parser;
 
     @Autowired
-    private ChatSessionSplitter splitter;
+    private VectorSessionSplitter splitter;
 
     @Test
     @DisplayName("真实环境集成测试：高效解析 87MB chat.html 并验证切分结果")

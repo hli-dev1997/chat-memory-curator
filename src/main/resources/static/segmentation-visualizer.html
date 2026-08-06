@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT 记忆切分 BGE 向量动态可视化诊断仪</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #151c2c;
+      --border-color: #232f48;
+      --accent-blue: #3b82f6;
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .brand {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: var(--bg-card);
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    .search-box {
+      flex: 1;
+      min-width: 260px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    input, select {
+      background: #0f172a;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent-blue);
+    }
+    select { min-width: 320px; }
+    .tabs { display: flex; gap: 8px; }
+    .tab-btn {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--text-sub);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { border-color: var(--accent-blue); color: var(--text-main); }
+    .tab-btn.active {
+      background: var(--accent-blue);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+    .pair-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .pair-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.strong { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge.ambiguous { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+    .badge.split { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid #f43f5e; }
+    .pair-body {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      padding: 20px;
+      align-items: center;
+    }
+    .msg-box {
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .msg-box .role {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .score-gauge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+    }
+    .score-num { font-size: 22px; font-weight: 700; font-family: 'Outfit'; }
+    .session-blocks { margin-top: 32px; }
+    .session-block {
+      border: 2px dashed var(--accent-blue);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .session-title { font-size: 16px; font-weight: 700; color: #60a5fa; margin-bottom: 12px; }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--accent-blue);
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">⚡ ChatGPT 记忆切分 BGE 向量动态可视化诊断仪</div>
+    <div style="color: var(--text-sub); font-size: 13px;" id="configText">门限加载中...</div>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="实时搜索全量 1,142 场对话 (输入 Kafka, Redis 等)..." oninput="onSearchInput()">
+      <select id="convSelect" onchange="onConvSelect()"></select>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="filterPairs('all', this)">全部 Pair</button>
+      <button class="tab-btn" onclick="filterPairs('strong', this)">🟢 强相关</button>
+      <button class="tab-btn" onclick="filterPairs('ambiguous', this)">🟡 模糊延伸区</button>
+      <button class="tab-btn" onclick="filterPairs('split', this)">🔴 跨主题切断</button>
+    </div>
+  </div>
+
+  <div id="contentContainer">
+    <div class="loading">正在连接后端初始化全量对话索引...</div>
+  </div>
+
+  <script>
+    let activeConfig = null;
+    let conversations = [];
+    let currentConvDetail = null;
+    let currentFilter = 'all';
+    let searchTimeout = null;
+
+    async function init() {
+      try {
+        // 1. 获取后端实时生效的配置门限
+        const cfgRes = await fetch('/api/v1/segmentation-visualizer/config');
+        const cfgData = await cfgRes.json();
+        if (cfgData.code === 200) {
+          activeConfig = cfgData.data;
+          document.getElementById('configText').innerText =
+            `门限规则：强相关 >= ${activeConfig.highThreshold} | 模糊区 ${activeConfig.lowThreshold} - ${activeConfig.highThreshold} | 跨主题 < ${activeConfig.lowThreshold} (短文本判定: ${activeConfig.shortTextMinLength}字)`;
+        }
+
+        // 2. 加载全量对话索引
+        await loadConversations('');
+      } catch (err) {
+        document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">后端连接失败: ${err.message}</div>`;
+      }
+    }
+
+    async function loadConversations(keyword) {
+      const url = keyword ? `/api/v1/segmentation-visualizer/conversations?keyword=${encodeURIComponent(keyword)}` : '/api/v1/segmentation-visualizer/conversations';
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.code === 200) {
+        conversations = json.data || [];
+        renderSelectOptions();
+        if (conversations.length > 0) {
+          await loadConvDetail(conversations[0].id);
+        } else {
+          document.getElementById('contentContainer').innerHTML = `<div class="loading">未找到包含关键字 "${escapeHtml(keyword)}" 的对话</div>`;
+        }
+      }
+    }
+
+    function renderSelectOptions() {
+      const select = document.getElementById('convSelect');
+      select.innerHTML = '';
+      conversations.forEach((c, i) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.innerText = `${i + 1}. ${c.title} (${c.messagesCount} 条消息)`;
+        select.appendChild(opt);
+      });
+    }
+
+    function onSearchInput() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const kw = document.getElementById('searchInput').value.trim();
+        loadConversations(kw);
+      }, 300);
+    }
+
+    async function onConvSelect() {
+      const convId = document.getElementById('convSelect').value;
+      if (convId) {
+        await loadConvDetail(convId);
+      }
+    }
+
+    async function loadConvDetail(convId) {
+      document.getElementById('contentContainer').innerHTML = `<div class="loading">正在按当前门限实算向量切分得分 (BGE 512维)...</div>`;
+      try {
+        const res = await fetch(`/api/v1/segmentation-visualizer/conversations/${convId}`);
+        const json = await res.json();
+        if (json.code === 200) {
+          currentConvDetail = json.data;
+          renderDetail();
+        } else {
+          document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">${json.message}</div>`;
+        }
+      } catch (err) {
+        document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">加载详情失败: ${err.message}</div>`;
+      }
+    }
+
+    function renderDetail() {
+      if (!currentConvDetail) return;
+
+      let pairsHtml = '';
+      currentConvDetail.pairs.forEach(p => {
+        if (currentFilter !== 'all' && p.type !== currentFilter) {
+          return;
+        }
+
+        let scoreColor = '#34d399';
+        if (p.type === 'ambiguous') scoreColor = '#fbbf24';
+        if (p.type === 'split') scoreColor = '#fb7185';
+
+        pairsHtml += `
+          <div class="pair-card">
+            <div class="pair-header">
+              <span style="font-weight:600; font-size:14px;">Pair #${p.index} (${escapeHtml(p.roleA)} → ${escapeHtml(p.roleB)})</span>
+              <span class="badge ${p.type}">${escapeHtml(p.label)}</span>
+            </div>
+            <div class="pair-body">
+              <div class="msg-box"><div class="role">[MESSAGE A - ${escapeHtml(p.roleA.toUpperCase())}]</div>${escapeHtml(p.textA)}</div>
+              <div class="score-gauge">
+                <div class="score-num" style="color: ${scoreColor}">${p.score}</div>
+                <div style="font-size:11px; color:var(--text-sub);">BGE 余弦得分</div>
+              </div>
+              <div class="msg-box"><div class="role">[MESSAGE B - ${escapeHtml(p.roleB.toUpperCase())}]</div>${escapeHtml(p.textB)}</div>
+            </div>
+          </div>
+        `;
+      });
+
+      let sessionsHtml = '';
+      currentConvDetail.sessions.forEach((s, idx) => {
+        let msgsHtml = '';
+        s.messages.forEach(m => {
+          msgsHtml += `<div class="msg-box" style="margin-bottom:8px;"><div class="role">[${escapeHtml(m.role)}]</div>${escapeHtml(m.content)}</div>`;
+        });
+        sessionsHtml += `
+          <div class="session-block">
+            <div class="session-title">Session #${idx + 1}: ${escapeHtml(s.sessionId)} (${s.messagesCount} 条消息)</div>
+            ${msgsHtml}
+          </div>
+        `;
+      });
+
+      document.getElementById('contentContainer').innerHTML = `
+        <div style="margin-bottom: 16px; font-size:14px; color:var(--text-sub);">
+          对话标题：<strong style="color:var(--text-main);">${escapeHtml(currentConvDetail.title)}</strong> | 原始消息数：${currentConvDetail.messagesCount} 条 | 切分生成 Session 块数：${currentConvDetail.sessionsCount} 个
+        </div>
+        ${pairsHtml || '<div class="loading">当前筛选条件下暂无 Pair 数据</div>'}
+        <div class="session-blocks">
+          <h2 style="margin-bottom:16px;">📦 拆分产物：该对话最终生成的 ${currentConvDetail.sessionsCount} 个独立 Session 单元</h2>
+          ${sessionsHtml}
+        </div>
+      `;
+    }
+
+    function filterPairs(type, btn) {
+      currentFilter = type;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderDetail();
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

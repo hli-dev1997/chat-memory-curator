@@ -4,7 +4,7 @@ import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ChatMessage;
 import com.chatgpt.memory.model.ChatSession;
 import com.chatgpt.memory.parser.ChatExportParser;
-import com.chatgpt.memory.service.ChatSessionSplitter;
+import com.chatgpt.memory.service.VectorSessionSplitter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * 完整对话内容提取与切分的可视化展示测试类
- * 用于直观展示从 chat.html 中提纯出的单场完整对话以及 4 小时切分后的 Session 格式
+ * 用于直观展示从 chat.html 中提纯出的单场完整对话以及 BGE 向量切分后的 Session 格式
  *
  * @author Antigravity
  */
@@ -35,7 +35,7 @@ class ChatExportVisualPrinterTest {
     private ChatExportParser parser;
 
     @Autowired
-    private ChatSessionSplitter splitter;
+    private VectorSessionSplitter splitter;
 
     @Test
     @DisplayName("打印提纯后的完整对话及按时间切分的 Session 片段")

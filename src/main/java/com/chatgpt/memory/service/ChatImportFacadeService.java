@@ -29,7 +29,7 @@ import java.util.List;
 public class ChatImportFacadeService {
 
     private final ChatExportParser chatExportParser;
-    private final ChatSessionSplitter chatSessionSplitter;
+    private final VectorSessionSplitter vectorSessionSplitter;
     private final ChatSessionDatabaseService chatSessionDatabaseService;
 
     /**
@@ -56,9 +56,9 @@ public class ChatImportFacadeService {
         final List<ChatConversation> conversations = chatExportParser.parseHtmlFile(htmlFile);
         final long parseCost = System.currentTimeMillis() - startParse;
 
-        // 步骤 2：4 小时无交互时间间隔逻辑切分
+        // 步骤 2：BGE 向量语义逻辑切分
         final long startSplit = System.currentTimeMillis();
-        final List<ChatSession> sessions = chatSessionSplitter.splitConversations(conversations);
+        final List<ChatSession> sessions = vectorSessionSplitter.splitConversations(conversations);
         final long splitCost = System.currentTimeMillis() - startSplit;
 
         // 步骤 3：内存数据直接批量 Upsert 落库 MySQL
