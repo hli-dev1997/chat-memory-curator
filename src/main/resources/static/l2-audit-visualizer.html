@@ -912,7 +912,7 @@
         let currentPage = 1;
         let totalRecords = 0;
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function initPage() {
             updateButtonTexts();
             loadStats();
             loadRecords();
@@ -923,7 +923,14 @@
                     openImageModal(e.target.src, e.target.alt || e.target.title);
                 }
             });
-        });
+        }
+
+        // 双重保障初始化：若 DOM 此时已加载完成直接触发，否则监听 DOMContentLoaded 事件
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPage);
+        } else {
+            initPage();
+        }
 
         // 打开大图预览 Modal
         function openImageModal(imgSrc, altText) {
