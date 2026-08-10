@@ -332,9 +332,14 @@
         }
 
         .conv-id {
-            font-size: 13px;
+            font-size: 12.5px;
             font-family: 'JetBrains Mono', monospace;
-            color: var(--text-muted);
+            color: #57534e;
+            background: #f7f0e1;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid #ebdcc3;
+            word-break: break-all;
         }
 
         .model-badge {
@@ -1072,7 +1077,7 @@
                 <div class="record-header">
                     <div class="pair-info">
                         <span class="pair-badge">Pair #${item.pairIndex} (ID: ${item.id})</span>
-                        <span class="conv-id" title="${item.parentConversationId}"><i class="fa-solid fa-hashtag"></i> ${item.parentConversationId.substring(0, 18)}...</span>
+                        <span class="conv-id" title="Session / Conversation ID"><i class="fa-solid fa-hashtag"></i> ${item.parentConversationId}</span>
                         <span class="model-badge"><i class="fa-solid fa-robot"></i> ${modelName}</span>
                         ${isOmni ? '<span class="att-badge"><i class="fa-solid fa-image"></i> 多模态图文</span>' : ''}
                         <span class="badge ${statusClass}">${statusText}</span>
