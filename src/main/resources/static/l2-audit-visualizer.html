@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L2 大模型精排裁决审计工作台 - 护眼视角</title>
+    <!-- Google Fonts & Marked.js for Markdown & FontAwesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* 护眼暖黄调 Design System Tokens */
+            --bg-page: #faf6ed;
+            --bg-card: #fffdf8;
+            --bg-card-hover: #fff9ed;
+            --bg-subtle: #f7f0e1;
+            
+            --border-color: #f3e6ce;
+            --border-focus: #d97706;
+            
+            --text-main: #292524;
+            --text-muted: #78716c;
+            --text-light: #a8a29e;
+            
+            --primary: #d97706;
+            --primary-hover: #b45309;
+            --primary-light: #fef3c7;
+
+            --accent-amber: #f59e0b;
+            --accent-green: #059669;
+            --accent-red: #dc2626;
+            --accent-purple: #7c3aed;
+            
+            --merge-color: #059669;
+            --merge-bg: #ecfdf5;
+            --merge-border: #a7f3d0;
+            
+            --split-color: #dc2626;
+            --split-bg: #fef2f2;
+            --split-border: #fecaca;
+            
+            --review-color: #ea580c;
+            --review-bg: #fff7ed;
+            --review-border: #ffedd5;
+            
+            --shadow-sm: 0 2px 8px rgba(180, 83, 9, 0.04);
+            --shadow-md: 0 8px 24px rgba(180, 83, 9, 0.08);
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        /* 顶部导航与看板 Header */
+        header {
+            max-width: 1380px;
+            margin: 0 auto 24px auto;
+            background: var(--bg-card);
+            padding: 24px 32px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .title-group i {
+            font-size: 28px;
+            color: var(--primary);
+            background: var(--primary-light);
+            padding: 12px;
+            border-radius: 12px;
+        }
+
+        .title-group h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1c1917;
+        }
+
+        .title-group p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* 统计卡片面板 Dashboard Grid (8个多维度指标) */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-subtle);
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 控制操作第二排按钮控制栏 Control Bar */
+        .control-row {
+            background: #fffdf0;
+            border: 1px solid #fde68a;
+            border-radius: var(--radius-md);
+            padding: 14px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .number-input {
+            width: 75px;
+            padding: 7px 9px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-align: center;
+            border-radius: 8px;
+            border: 1px solid #fcd34d;
+            background: #ffffff;
+            color: #78350f;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            border-radius: 9px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-warning {
+            background-color: var(--primary);
+            color: #ffffff;
+        }
+        .btn-warning:hover {
+            background-color: var(--primary-hover);
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
+        }
+
+        .btn-primary {
+            background-color: #059669;
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            background-color: #047857;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-subtle);
+            color: var(--text-main);
+            border-color: var(--border-color);
+        }
+        .btn-secondary:hover {
+            background-color: var(--primary-light);
+            border-color: var(--border-focus);
+            color: var(--primary-hover);
+        }
+
+        /* 搜索过滤控制栏 Filter Bar */
+        .filter-bar {
+            max-width: 1380px;
+            margin: 0 auto 24px auto;
+            background: var(--bg-card);
+            padding: 18px 24px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        select, input {
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: #ffffff;
+            color: var(--text-main);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 240px;
+        }
+
+        /* 主列表 View Content */
+        main {
+            max-width: 1380px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .record-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.25s ease;
+            position: relative;
+        }
+
+        .record-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: #fcd34d;
+        }
+
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 14px;
+            margin-bottom: 14px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .pair-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pair-badge {
+            background: var(--primary-light);
+            color: var(--primary-hover);
+            font-weight: 700;
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .conv-id {
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+        }
+
+        .model-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .att-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .verdict-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-merge {
+            background-color: var(--merge-bg);
+            color: var(--merge-color);
+            border: 1px solid var(--merge-border);
+        }
+
+        .badge-split {
+            background-color: var(--split-bg);
+            color: var(--split-color);
+            border: 1px solid var(--split-border);
+        }
+
+        .badge-conf-high { background-color: #dcfce7; color: #15803d; }
+        .badge-conf-medium { background-color: #fef9c3; color: #a16207; }
+        .badge-conf-low { background-color: #fee2e2; color: #b91c1c; }
+
+        .badge-status {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .status-done { background: #e0f2fe; color: #0369a1; }
+        .status-review { background: #ffedd5; color: #c2410c; }
+        .status-override { background: #f3e8ff; color: #6b21a8; }
+
+        /* L2 裁决推导逻辑框 Reasoning Box */
+        .reasoning-box {
+            background: #fffdf0;
+            border-left: 4px solid var(--primary);
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 13.5px;
+            color: #44403c;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .reasoning-box i {
+            color: var(--primary);
+            font-size: 16px;
+            margin-top: 2px;
+        }
+
+        /* 消息 Chunk A & B 比较盒 (严格 50%/50% 平分布局) */
+        .chunks-comparison {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 14px;
+            width: 100%;
+        }
+
+        @media (max-width: 840px) {
+            .chunks-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chunk-card {
+            background: #faf7f2;
+            border: 1px solid #f2e7d5;
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            min-width: 0; /* 极其关键：防止超长非换行文本/代码卡片无限挤压另一栏 */
+            width: 100%;
+        }
+
+        .chunk-header {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chunk-body {
+            font-size: 13.5px;
+            color: var(--text-main);
+            max-height: 280px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 6px;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .chunk-body pre, .chunk-body code {
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+            overflow-x: auto;
+            background: #f4edd9;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .chunk-body img {
+            max-width: 100%;
+            max-height: 220px;
+            border-radius: 8px;
+            margin: 8px 0;
+            border: 1px solid var(--border-color);
+            display: block;
+        }
+
+        /* 卡片底部操作栏 Card Footer */
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border-color);
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .audit-btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .btn-pass {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .btn-pass:hover { background: #bbf7d0; }
+
+        .btn-override-merge {
+            background: #fef3c7;
+            color: #b45309;
+            border: 1px solid #fde68a;
+        }
+        .btn-override-merge:hover { background: #fde68a; }
+
+        .btn-override-split {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .btn-override-split:hover { background: #fecaca; }
+
+        /* 分页控件 Pagination */
+        .pagination-container {
+            max-width: 1380px;
+            margin: 24px auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            padding: 16px 24px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .page-info {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            color: var(--primary-light);
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部导航 Header -->
+    <header>
+        <div class="header-top">
+            <div class="title-group">
+                <i class="fa-solid fa-eye-dropper"></i>
+                <div>
+                    <h1>L2 大模型精排裁决审计工作台</h1>
+                    <p>暖黄护眼模式 · 智能多模态与纯文本裁决评估、逻辑对比与人工自主调度</p>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-secondary" onclick="loadStats(); loadRecords();">
+                    <i class="fa-solid fa-arrows-rotate"></i> 刷新数据
+                </button>
+            </div>
+        </div>
+
+        <!-- 统计卡片面板 第一排看板 Dashboard -->
+        <div class="stats-grid">
+            <div class="stat-card" style="background: #fffbeb; border-color: #fde68a;">
+                <div class="stat-label"><i class="fa-solid fa-database"></i> 模糊区总条数</div>
+                <div class="stat-value" id="statTotalFuzzy" style="color: #92400e;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-image"></i> 含图 (Omni多模态)</div>
+                <div class="stat-value" id="statFuzzyImages" style="color: #3730a3;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-file-lines"></i> 纯文本 (Text模型)</div>
+                <div class="stat-value" id="statFuzzyText" style="color: #431407;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-circle-check"></i> 已精排落表数</div>
+                <div class="stat-value" id="statJudged" style="color: #047857;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-hourglass-half"></i> 剩余未精排数</div>
+                <div class="stat-value" id="statPending" style="color: #b45309;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-code-merge"></i> MERGE 强关联</div>
+                <div class="stat-value" id="statMerge" style="color: var(--merge-color);">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-scissors"></i> SPLIT 主题切断</div>
+                <div class="stat-value" id="statSplit" style="color: var(--split-color);">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fa-solid fa-triangle-exclamation"></i> 需人工复核</div>
+                <div class="stat-value" id="statReview" style="color: var(--review-color);">-</div>
+            </div>
+        </div>
+
+        <!-- 第二排控制按钮行 Control Actions Row -->
+        <div class="control-row">
+            <!-- 组 1：强制覆盖重跑前 N 条 -->
+            <div class="control-group">
+                <span class="control-label"><i class="fa-solid fa-rotate-right"></i> 强行覆盖重跑:</span>
+                <input type="number" id="overwriteCount" class="number-input" value="100" min="1" max="10000" placeholder="处理条数" oninput="updateButtonTexts()">
+                <span class="control-label" style="font-weight: 500; color: var(--text-muted);">条</span>
+                <button class="btn btn-warning" onclick="triggerRunStage2(true)">
+                    <i class="fa-solid fa-bolt"></i> ⚡ 强行覆盖推导前 <span id="overwriteBtnNum">100</span> 条
+                </button>
+            </div>
+
+            <!-- 组 2：增量接着跑剩余未审记录 -->
+            <div class="control-group">
+                <span class="control-label" style="color: #047857;"><i class="fa-solid fa-play"></i> 增量接着跑:</span>
+                <input type="number" id="resumeCount" class="number-input" value="100" min="0" max="10000" placeholder="0为全量" oninput="updateButtonTexts()">
+                <span class="control-label" style="font-weight: 500; color: var(--text-muted);">条</span>
+                <button class="btn btn-primary" onclick="triggerRunStage2(false)">
+                    <i class="fa-solid fa-circle-play"></i> ▶ 接着推导剩余 <span id="resumeBtnNum">100</span> 条未审记录
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 筛选过滤控制栏 Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">消息模态：</span>
+            <select id="filterAtt" onchange="currentPage=1; loadRecords();">
+                <option value="">全部模态</option>
+                <option value="1">包含图片/附件 (Omni模型)</option>
+                <option value="0">纯文本消息 (Text模型)</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">L2 裁决：</span>
+            <select id="filterVerdict" onchange="currentPage=1; loadRecords();">
+                <option value="">全部裁决</option>
+                <option value="MERGE">MERGE (合并关联)</option>
+                <option value="SPLIT">SPLIT (拆分主题)</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">置信度：</span>
+            <select id="filterConfidence" onchange="currentPage=1; loadRecords();">
+                <option value="">全部置信度</option>
+                <option value="HIGH">HIGH (极高)</option>
+                <option value="MEDIUM">MEDIUM (中等)</option>
+                <option value="LOW">LOW (偏低)</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">状态：</span>
+            <select id="filterStatus" onchange="currentPage=1; loadRecords();">
+                <option value="">全部状态</option>
+                <option value="DONE">DONE (完成)</option>
+                <option value="NEED_MANUAL_REVIEW">NEED_MANUAL_REVIEW (待复核)</option>
+                <option value="MANUAL_OVERRIDE">MANUAL_OVERRIDE (已强改)</option>
+            </select>
+        </div>
+
+        <input type="text" id="searchKeyword" class="search-input" placeholder="输入对话 ID、文本正文或裁决理由检索..." onkeyup="if(event.key==='Enter'){currentPage=1; loadRecords();}">
+        <button class="btn btn-secondary" onclick="currentPage=1; loadRecords();">
+            <i class="fa-solid fa-magnifying-glass"></i> 检索
+        </button>
+    </div>
+
+    <!-- 记录卡片主内容容器 Main Content -->
+    <main id="recordsContainer">
+        <!-- 动态渲染卡片列表 -->
+    </main>
+
+    <!-- 底部分页控制工具条 Pagination -->
+    <div class="pagination-container">
+        <div class="page-info" id="pageInfo">正在加载数据...</div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <!-- 每页显示条数修改输入框 -->
+            <div class="filter-group">
+                <span class="filter-label">每页:</span>
+                <input type="number" id="pageSizeInput" class="number-input" value="15" min="1" max="500" style="width: 70px;" onchange="onPageSizeChange()">
+                <span class="filter-label">条</span>
+            </div>
+
+            <!-- 精确跳页输入框 -->
+            <div class="filter-group">
+                <span class="filter-label">跳转至:</span>
+                <input type="number" id="jumpPageInput" class="number-input" value="1" min="1" style="width: 70px;" onkeyup="if(event.key==='Enter') jumpToPage()">
+                <span class="filter-label">页</span>
+                <button class="btn btn-secondary btn-sm" onclick="jumpToPage()">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> 跳转
+                </button>
+            </div>
+
+            <!-- 上一页 / 下一页 按键 -->
+            <button class="btn btn-secondary btn-sm" id="btnPrevPage" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> 上一页</button>
+            <button class="btn btn-secondary btn-sm" id="btnNextPage" onclick="changePage(1)">下一页 <i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let totalRecords = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateButtonTexts();
+            loadStats();
+            loadRecords();
+        });
+
+        // 动态同步输入框条数到按钮文字中
+        function updateButtonTexts() {
+            const overwriteVal = document.getElementById('overwriteCount').value;
+            const resumeVal = document.getElementById('resumeCount').value;
+
+            document.getElementById('overwriteBtnNum').innerText = (overwriteVal && overwriteVal.trim() !== '') ? overwriteVal : '0';
+
+            if (resumeVal === '0' || !resumeVal || resumeVal.trim() === '') {
+                document.getElementById('resumeBtnNum').innerText = '全量';
+            } else {
+                document.getElementById('resumeBtnNum').innerText = resumeVal;
+            }
+        }
+
+        // 获取当前用户设置或保持的每页条数
+        function getPageSize() {
+            const inputVal = document.getElementById('pageSizeInput').value;
+            const size = parseInt(inputVal, 10);
+            return (size && size > 0) ? size : 15;
+        }
+
+        // 1. 加载顶部看板统计指标
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/v1/segmentation-visualizer/l2-stats');
+                const json = await res.json();
+                if (json.code === 200 && json.stats) {
+                    const s = json.stats;
+                    document.getElementById('statTotalFuzzy').innerText = s.totalFuzzy || s.TOTALFUZZY || 0;
+                    document.getElementById('statFuzzyImages').innerText = s.totalFuzzyImages || s.TOTALFUZZYIMAGES || 0;
+                    document.getElementById('statFuzzyText').innerText = s.totalFuzzyText || s.TOTALFUZZYTEXT || 0;
+                    document.getElementById('statJudged').innerText = s.totalJudged || s.TOTALJUDGED || 0;
+                    document.getElementById('statPending').innerText = s.totalPending || s.TOTALPENDING || 0;
+                    document.getElementById('statMerge').innerText = s.totalMerge || s.TOTALMERGE || 0;
+                    document.getElementById('statSplit').innerText = s.totalSplit || s.TOTALSPLIT || 0;
+                    document.getElementById('statReview').innerText = s.totalReview || s.TOTALREVIEW || 0;
+                }
+            } catch (err) {
+                console.error('加载看板统计数据失败:', err);
+            }
+        }
+
+        // 2. 条件查询并渲染 L2 裁决记录卡片
+        async function loadRecords() {
+            const container = document.getElementById('recordsContainer');
+            container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>正在读取 L2 裁决落表记录...</p></div>';
+
+            const att = document.getElementById('filterAtt').value;
+            const verdict = document.getElementById('filterVerdict').value;
+            const confidence = document.getElementById('filterConfidence').value;
+            const status = document.getElementById('filterStatus').value;
+            const keyword = document.getElementById('searchKeyword').value;
+            const currentSize = getPageSize();
+
+            let url = `/api/v1/segmentation-visualizer/l2-records?page=${currentPage}&pageSize=${currentSize}`;
+            if (att) url += `&hasAttachment=${att}`;
+            if (verdict) url += `&l2Verdict=${verdict}`;
+            if (confidence) url += `&l2Confidence=${confidence}`;
+            if (status) url += `&processStatus=${status}`;
+            if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.code !== 200 || !data.list || data.list.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <p>暂无符合条件的 L2 精排裁决记录</p>
+                        </div>`;
+                    updatePagination(0);
+                    return;
+                }
+
+                totalRecords = data.total;
+                updatePagination(data.list.length);
+
+                let html = '';
+                data.list.forEach(item => {
+                    html += renderRecordCard(item);
+                });
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error('获取 L2 记录列表失败:', err);
+                container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>加载失败，请检查后端服务是否正常响应。</p></div>`;
+            }
+        }
+
+        // 渲染单条 Pair 记录卡片
+        function renderRecordCard(item) {
+            const isMerge = (item.l2Verdict === 'MERGE');
+            const verdictBadgeClass = isMerge ? 'badge-merge' : 'badge-split';
+            
+            let confClass = 'badge-conf-high';
+            if (item.l2Confidence === 'MEDIUM') confClass = 'badge-conf-medium';
+            if (item.l2Confidence === 'LOW') confClass = 'badge-conf-low';
+
+            let statusClass = 'status-done';
+            let statusText = '已完成 (DONE)';
+            if (item.processStatus === 'NEED_MANUAL_REVIEW') {
+                statusClass = 'status-review';
+                statusText = '待人审 (NEED_MANUAL_REVIEW)';
+            } else if (item.processStatus === 'MANUAL_OVERRIDE') {
+                statusClass = 'status-override';
+                statusText = '人审强改 (MANUAL_OVERRIDE)';
+            }
+
+            const modelName = item.l2Model || 'qwen3.6-flash';
+            const isOmni = item.hasAttachment === 1 || (modelName && modelName.toLowerCase().includes('omni'));
+
+            // 渲染富文本与 Markdown
+            const renderedTextA = marked.parse(item.messageAText || '');
+            const renderedTextB = marked.parse(item.messageBText || '');
+
+            const formattedUpdateTime = item.updateTime ? item.updateTime.replace('T', ' ') : '-';
+
+            return `
+            <div class="record-card" id="pair-card-${item.id}">
+                <div class="record-header">
+                    <div class="pair-info">
+                        <span class="pair-badge">Pair #${item.pairIndex} (ID: ${item.id})</span>
+                        <span class="conv-id" title="${item.parentConversationId}"><i class="fa-solid fa-hashtag"></i> ${item.parentConversationId.substring(0, 18)}...</span>
+                        <span class="model-badge"><i class="fa-solid fa-robot"></i> ${modelName}</span>
+                        ${isOmni ? '<span class="att-badge"><i class="fa-solid fa-image"></i> 多模态图文</span>' : ''}
+                        <span class="badge ${statusClass}">${statusText}</span>
+                    </div>
+
+                    <div class="verdict-badges">
+                        <span class="badge ${verdictBadgeClass}"><i class="fa-solid ${isMerge ? 'fa-code-merge' : 'fa-scissors'}"></i> ${item.l2Verdict || 'N/A'}</span>
+                        <span class="badge ${confClass}">置信度: ${item.l2Confidence || 'N/A'}</span>
+                    </div>
+                </div>
+
+                <!-- L2 模型判决理由框 -->
+                <div class="reasoning-box">
+                    <i class="fa-solid fa-quote-left"></i>
+                    <div>
+                        <strong>AI 裁决依据：</strong> ${item.l2Reason || '暂无说明'}
+                    </div>
+                </div>
+
+                <!-- Chunk A 与 Chunk B 对比 -->
+                <div class="chunks-comparison">
+                    <div class="chunk-card">
+                        <div class="chunk-header">
+                            <span><i class="fa-solid fa-message"></i> Chunk A (消息 #${item.pairIndex})</span>
+                            <span>角色: ${item.messageARole || 'user'}</span>
+                        </div>
+                        <div class="chunk-body">${renderedTextA}</div>
+                    </div>
+
+                    <div class="chunk-card">
+                        <div class="chunk-header">
+                            <span><i class="fa-solid fa-reply"></i> Chunk B (消息 #${item.pairIndex + 1})</span>
+                            <span>角色: ${item.messageBRole || 'assistant'}</span>
+                        </div>
+                        <div class="chunk-body">${renderedTextB}</div>
+                    </div>
+                </div>
+
+                <!-- 卡片底部 -->
+                <div class="card-footer">
+                    <div>
+                        <span>L1 向量得分: <strong>${item.l1Score || '-'}</strong> (${item.l1Zone || '-'})</span>
+                        <span style="margin-left: 12px;">更新时间: ${formattedUpdateTime}</span>
+                    </div>
+                    <div class="audit-btn-group">
+                        <button class="btn btn-sm btn-pass" onclick="submitAudit(${item.id}, 'PASSED', '${item.l2Verdict || 'MERGE'}')">
+                            <i class="fa-solid fa-check"></i> 认可决议
+                        </button>
+                        <button class="btn btn-sm btn-override-merge" onclick="submitAudit(${item.id}, 'OVERRIDDEN', 'MERGE')">
+                            <i class="fa-solid fa-code-merge"></i> 强改 MERGE
+                        </button>
+                        <button class="btn btn-sm btn-override-split" onclick="submitAudit(${item.id}, 'OVERRIDDEN', 'SPLIT')">
+                            <i class="fa-solid fa-scissors"></i> 强改 SPLIT
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // 3. 更新分页显示与保持状态
+        function updatePagination(currentCount) {
+            const currentSize = getPageSize();
+            const totalPages = Math.ceil(totalRecords / currentSize) || 1;
+            document.getElementById('pageInfo').innerText = `显示第 ${currentPage} / ${totalPages} 页，本页 ${currentCount} 条（匹配总计 ${totalRecords} 条）`;
+            
+            document.getElementById('jumpPageInput').value = currentPage;
+            document.getElementById('jumpPageInput').max = totalPages;
+
+            document.getElementById('btnPrevPage').disabled = (currentPage <= 1);
+            document.getElementById('btnNextPage').disabled = (currentPage >= totalPages);
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            if (currentPage < 1) currentPage = 1;
+            loadRecords();
+        }
+
+        function jumpToPage() {
+            const currentSize = getPageSize();
+            const totalPages = Math.ceil(totalRecords / currentSize) || 1;
+            let targetPage = parseInt(document.getElementById('jumpPageInput').value, 10);
+
+            if (isNaN(targetPage) || targetPage < 1) {
+                targetPage = 1;
+            } else if (targetPage > totalPages) {
+                targetPage = totalPages;
+            }
+
+            currentPage = targetPage;
+            loadRecords();
+        }
+
+        function onPageSizeChange() {
+            currentPage = 1;
+            loadRecords();
+        }
+
+        // 4. 人工点击审核提交
+        async function submitAudit(pairId, status, verdict) {
+            const formData = new FormData();
+            formData.append('pairId', pairId);
+            formData.append('stage', 'L2');
+            formData.append('status', status);
+            formData.append('verdict', verdict);
+            formData.append('remark', '人工复核面板在线修正');
+
+            try {
+                const res = await fetch('/api/v1/segmentation-visualizer/audit', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.code === 200) {
+                    loadStats();
+                    loadRecords();
+                } else {
+                    alert('提交失败: ' + data.message);
+                }
+            } catch (err) {
+                alert('提交失败，服务网络异常');
+            }
+        }
+
+        // 5. 按钮控制触发 Stage 2 推导
+        async function triggerRunStage2(forceOverwrite) {
+            const countInputId = forceOverwrite ? 'overwriteCount' : 'resumeCount';
+            const countVal = document.getElementById(countInputId).value || '100';
+            const maxCount = parseInt(countVal, 10);
+
+            const modeText = forceOverwrite ? `【强制覆盖重跑前 ${maxCount} 条】` : `【增量接着推导剩余 ${maxCount > 0 ? maxCount : '全量'} 条未审记录】`;
+            if (!confirm(`确认要启动 L2 大模型推导 ${modeText} 吗？`)) {
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('forceOverwrite', forceOverwrite ? 'true' : 'false');
+                formData.append('maxCount', maxCount.toString());
+
+                const res = await fetch('/api/v1/segmentation-visualizer/run-stage2', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                alert(data.message || 'Stage 2 推导任务已在后台异步启动！');
+                
+                setTimeout(() => {
+                    loadStats();
+                    loadRecords();
+                }, 1500);
+            } catch (err) {
+                alert('请求异常，无法启动 Stage 2 任务');
+            }
+        }
+    </script>
+</body>
+</html>

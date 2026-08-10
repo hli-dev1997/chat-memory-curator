@@ -1,19 +1,32 @@
 package com.chatgpt.memory.service;
 
 import com.chatgpt.memory.common.enums.L1ZoneEnum;
+import com.chatgpt.memory.common.enums.LlmModelEnum;
 import com.chatgpt.memory.common.enums.ProcessStatusEnum;
 import com.chatgpt.memory.common.enums.PromptTemplateEnum;
 import com.chatgpt.memory.integration.qwen.QwenClient;
+import com.chatgpt.memory.integration.qwen.QwenModelFactory;
 import com.chatgpt.memory.mapper.SessionBoundaryPairMapper;
 import com.chatgpt.memory.model.ChatConversation;
 import com.chatgpt.memory.model.ConversationPairDetail;
 import com.chatgpt.memory.model.VectorSegmentationResult;
 import com.chatgpt.memory.model.entity.SessionBoundaryPairDO;
+import com.chatgpt.memory.util.ImageBase64Util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.output.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 会话切分三阶段流水线服务类
@@ -47,6 +61,9 @@ public class SessionBoundaryPipelineService {
     /** 通义千问大模型客户端 */
     private final QwenClient qwenClient;
 
+    /** 通义千问模型动态构建与缓存工厂 */
+    private final QwenModelFactory qwenModelFactory;
+
     /** JSON 序列化与反序列化工具 */
     private final ObjectMapper objectMapper;
 
@@ -58,6 +75,18 @@ public class SessionBoundaryPipelineService {
     @Value("${chat.segmentation.l1-low-threshold:0.60}")
     private double lowThreshold;
 
+    /** 启动时是否自动运行 Stage 2 L2 精排推导 */
+    @Value("${chat.segmentation.l2-auto-run-enabled:false}")
+    private boolean autoRunEnabled;
+
+    /** 启动时自动运行的定量处理上限条数 */
+    @Value("${chat.segmentation.l2-auto-run-limit:100}")
+    private int autoRunLimit;
+
+    /** 启动时自动运行时是否强制覆盖已有 L2 裁决 */
+    @Value("${chat.segmentation.l2-force-overwrite:true}")
+    private boolean autoRunForceOverwrite;
+
     /** Stage 2 批处理拉取记录条数 */
     private static final int STAGE2_BATCH_SIZE = 50;
 
@@ -65,11 +94,36 @@ public class SessionBoundaryPipelineService {
     private static final int MSG_TRUNCATE_LENGTH = 4000;
 
     /**
-     * 初始化创建数据库表（若不存在）
+     * 应用启动完毕后自动触发 Stage 2 L2 精排推导（若配置开启）
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        if (autoRunEnabled) {
+            log.info("[Startup] 检测到 chat.segmentation.l2-auto-run-enabled=true，应用启动后自动触发 Stage 2 精排 (limit={}, forceOverwrite={})...",
+                    autoRunLimit > 0 ? autoRunLimit : "UNLIMITED", autoRunForceOverwrite);
+            CompletableFuture.runAsync(() -> {
+                try {
+                    initTable();
+                    final int processed = runStage2(null, null, autoRunForceOverwrite, autoRunLimit);
+                    log.info("[Startup] 自动 Stage 2 精排推导任务顺利完成，共处理 {} 条 Pair 记录。", processed);
+                } catch (Exception e) {
+                    log.error("[Startup] 自动 Stage 2 精排推导发生异常", e);
+                }
+            });
+        }
+    }
+
+    /**
+     * 初始化创建数据库表（若不存在则建表，若表已存在则平滑校验补全列）
      */
     public void initTable() {
         sessionBoundaryPairMapper.createTableIfNotExists();
-        log.info("[Init] session_boundary_pair 表初始化完毕。");
+        try {
+            sessionBoundaryPairMapper.addColumnL2ModelIfNotExists();
+        } catch (Exception e) {
+            log.debug("[Init] l2_model 列补全检查完毕 (已存在或跳过)。");
+        }
+        log.info("[Init] session_boundary_pair 表与列结构初始化完毕。");
     }
 
     /**
@@ -215,41 +269,112 @@ public class SessionBoundaryPipelineService {
     }
 
     /**
-     * Stage 2：扫描 PENDING 状态记录并调用千问模型精排
+     * Stage 2：扫描 PENDING / FUZZY 状态记录并调用千问模型精排（默认分流模式，只处理未裁决记录）
      *
      * @return 批次精排完成的 Pair 记录条数
      */
     public int runStage2() {
+        return runStage2(null, null, false, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Stage 2：扫描模糊区记录并调用大模型精排（支持自定义指定模型与强行覆盖重推导）
+     *
+     * @param customTextModel       自定义文本模型枚举（可为空，为空则使用系统默认 QWEN_TEXT_FLASH）
+     * @param customMultimodalModel 自定义多模态模型枚举（可为空，为空则使用系统默认 QWEN_OMNI_FLASH）
+     * @param forceOverwrite        是否强行覆盖已有的 L2 裁决记录（true：重新推导全量 FUZZY 区 Pair；false：仅推导未裁决的 FUZZY 区 Pair）
+     * @return 批次精排完成的 Pair 记录条数
+     */
+    public int runStage2(final LlmModelEnum customTextModel,
+                         final LlmModelEnum customMultimodalModel,
+                         final boolean forceOverwrite) {
+        return runStage2(customTextModel, customMultimodalModel, forceOverwrite, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Stage 2：扫描模糊区记录并调用大模型精排（支持自定义指定模型、强行覆盖与定量上限截断）
+     *
+     * @param customTextModel       自定义文本模型枚举（可为空，默认 QWEN_TEXT_FLASH）
+     * @param customMultimodalModel 自定义多模态模型枚举（可为空，默认 QWEN_OMNI_FLASH）
+     * @param forceOverwrite        是否强行覆盖已有的 L2 裁决记录（true：重新推导全量 FUZZY 区 Pair；false：仅推导未裁决的 FUZZY 区 Pair）
+     * @param maxCount              定量处理最大记录条数上限（例如 100 条）
+     * @return 批次精排完成的 Pair 记录条数
+     */
+    public int runStage2(final LlmModelEnum customTextModel,
+                         final LlmModelEnum customMultimodalModel,
+                         final boolean forceOverwrite,
+                         final int maxCount) {
+        final int targetLimit = maxCount > 0 ? maxCount : Integer.MAX_VALUE;
         int totalProcessed = 0;
+        Long lastId = 0L;
         List<SessionBoundaryPairDO> batch;
 
         do {
-            batch = sessionBoundaryPairMapper.selectPendingList(STAGE2_BATCH_SIZE);
+            final int currentBatchSize = Math.min(STAGE2_BATCH_SIZE, targetLimit - totalProcessed);
+            if (currentBatchSize <= 0) {
+                break;
+            }
+
+            batch = sessionBoundaryPairMapper.selectL2ProcessList(forceOverwrite, lastId, currentBatchSize);
             if (batch.isEmpty()) {
                 break;
             }
 
-            log.info("[Stage2] 开始处理本批 {} 条 PENDING 记录。", batch.size());
-            for (final SessionBoundaryPairDO pairDO : batch) {
-                processOnePair(pairDO);
-                totalProcessed++;
-            }
-        } while (batch.size() == STAGE2_BATCH_SIZE);
+            log.info("[Stage2] 开始处理本批 {} 条模糊区记录 (lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
+                    batch.size(), lastId, forceOverwrite, totalProcessed, targetLimit);
 
-        log.info("[Stage2] 精排完成，共处理 {} 条模糊区 Pair。", totalProcessed);
+            for (final SessionBoundaryPairDO pairDO : batch) {
+                processOnePair(pairDO, customTextModel, customMultimodalModel);
+                totalProcessed++;
+                lastId = pairDO.getId();
+                if (totalProcessed >= targetLimit) {
+                    break;
+                }
+            }
+        } while (totalProcessed < targetLimit && batch.size() == STAGE2_BATCH_SIZE);
+
+        log.info("[Stage2] L2 精排裁决完成，共定量处理 {} 条 Pair 记录。", totalProcessed);
         return totalProcessed;
     }
 
     /**
-     * 单条 Pair 调用大模型裁决及处理结果回填
+     * 单条 Pair 调用大模型裁决及处理结果回填（默认路由模型）
      *
      * @param pairDO 待处理 Pair 实体
      */
     private void processOnePair(final SessionBoundaryPairDO pairDO) {
-        final PromptTemplateEnum template = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
-        final String userPrompt = String.format(
+        processOnePair(pairDO, null, null);
+    }
+
+    /**
+     * 单条 Pair 调用大模型裁决及处理结果回填（支持纯文本与多模态模型分流路由与模型覆写）
+     *
+     * @param pairDO                待处理 Pair 实体
+     * @param customTextModel       自定义文本模型枚举（可选）
+     * @param customMultimodalModel 自定义多模态模型枚举（可选）
+     */
+    private void processOnePair(final SessionBoundaryPairDO pairDO,
+                                final LlmModelEnum customTextModel,
+                                final LlmModelEnum customMultimodalModel) {
+        final boolean isMultimodal = Integer.valueOf(1).equals(pairDO.getHasAttachment());
+        final PromptTemplateEnum template = isMultimodal
+                ? PromptTemplateEnum.L2_MULTIMODAL_SESSION_SPLIT
+                : PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
+
+        final LlmModelEnum defaultModel = isMultimodal
+                ? LlmModelEnum.QWEN_OMNI_FLASH
+                : LlmModelEnum.QWEN_TEXT_FLASH;
+
+        final LlmModelEnum modelEnum = isMultimodal
+                ? (customMultimodalModel != null ? customMultimodalModel : defaultModel)
+                : (customTextModel != null ? customTextModel : defaultModel);
+
+        final ChatLanguageModel model = qwenModelFactory.getModel(modelEnum);
+
+        final String l1ScoreStr = pairDO.getL1Score() != null ? pairDO.getL1Score().toPlainString() : "0.0000";
+        final String userPromptText = String.format(
                 template.getUserPromptTemplate(),
-                pairDO.getL1Score().toPlainString(),
+                l1ScoreStr,
                 pairDO.getMessageAText(),
                 pairDO.getMessageBText());
 
@@ -260,15 +385,75 @@ public class SessionBoundaryPipelineService {
         String processStatus;
 
         try {
-            final String rawResponse = qwenClient.generateWithSystem(template.getSystemPrompt(), userPrompt);
-            log.debug("[Stage2] Pair {} 千问响应原文: {}", pairDO.getId(), rawResponse);
+            final Response<AiMessage> response;
+            if (isMultimodal) {
+                final List<Content> contents = new ArrayList<>();
 
-            final JsonNode node = objectMapper.readTree(rawResponse);
+                // 1. 注入 Chunk A 的文本与关联图片
+                final String headerA = String.format(
+                        "向量相似度得分：%s (划归边界评估区)\n\n【对话片段 A (前文结尾约 200 字)】：\n%s",
+                        l1ScoreStr, pairDO.getMessageAText());
+                contents.add(TextContent.from(headerA));
+
+                final List<String> imagesA = ImageBase64Util.extractBase64Images(pairDO.getMessageAText());
+                for (final String dataUri : imagesA) {
+                    contents.add(ImageContent.from(dataUri));
+                }
+
+                // 2. 注入 Chunk B 的文本与关联图片
+                final String headerB = String.format(
+                        "\n\n【对话片段 B (当前上下文开头约 200 字)】：\n%s",
+                        pairDO.getMessageBText());
+                contents.add(TextContent.from(headerB));
+
+                final List<String> imagesB = ImageBase64Util.extractBase64Images(pairDO.getMessageBText());
+                for (final String dataUri : imagesB) {
+                    contents.add(ImageContent.from(dataUri));
+                }
+
+                // 3. 注入裁决引导提示词
+                contents.add(TextContent.from(
+                        "\n\n【裁决任务说明】：\n请结合上述紧跟文本顺序的 Chunk A 及其图片与 Chunk B 及其图片，判断 Chunk B 是否与 Chunk A 属于同一会话上下文，并按指定 JSON 格式输出判定结果。"
+                ));
+
+                log.info("[Stage2-Request] Pair {} -> 调起全模态模型 [{}] | Prompt: {} | Chunk A 图片: {} 张, Chunk B 图片: {} 张 | Chunk A 文本预览: [{}] | Chunk B 文本预览: [{}]",
+                        pairDO.getId(), modelEnum.getModelName(), template.getCode(), imagesA.size(), imagesB.size(),
+                        truncateText(pairDO.getMessageAText(), 80), truncateText(pairDO.getMessageBText(), 80));
+
+                response = model.generate(
+                        SystemMessage.from(template.getSystemPrompt()),
+                        UserMessage.from(contents)
+                );
+            } else {
+                log.info("[Stage2-Request] Pair {} -> 调起纯语言模型 [{}] | Prompt: {} | Chunk A 文本预览: [{}] | Chunk B 文本预览: [{}]",
+                        pairDO.getId(), modelEnum.getModelName(), template.getCode(),
+                        truncateText(pairDO.getMessageAText(), 80), truncateText(pairDO.getMessageBText(), 80));
+
+                response = model.generate(
+                        SystemMessage.from(template.getSystemPrompt()),
+                        UserMessage.from(userPromptText)
+                );
+            }
+
+            final String rawResponse = (response != null && response.content() != null)
+                    ? response.content().text()
+                    : "";
+            log.info("[Stage2-Response] Pair {} -> 收到模型原始响应: {}", pairDO.getId(), rawResponse);
+
+            String jsonText = rawResponse != null ? rawResponse.trim() : "";
+            if (jsonText.startsWith("```")) {
+                final int firstNewline = jsonText.indexOf('\n');
+                final int lastBacktick = jsonText.lastIndexOf("```");
+                if (firstNewline != -1 && lastBacktick > firstNewline) {
+                    jsonText = jsonText.substring(firstNewline + 1, lastBacktick).trim();
+                }
+            }
+
+            final JsonNode node = objectMapper.readTree(jsonText);
             l2Verdict    = getTextSafe(node, "action");
             l2Confidence = getTextSafe(node, "confidence");
             l2Reason     = getTextSafe(node, "reason");
 
-            // 置信度较低时转入人工复核队列，按默认规则倾向 MERGE
             if ("LOW".equalsIgnoreCase(l2Confidence)) {
                 log.warn("[Stage2] Pair {} 置信度过低(LOW)，转入人工复核。", pairDO.getId());
                 finalDecision = "MERGE";
@@ -278,7 +463,6 @@ public class SessionBoundaryPipelineService {
                 processStatus = ProcessStatusEnum.DONE.getCode();
             }
         } catch (Exception e) {
-            // 解析失败按原则安全降级为 MERGE
             log.error("[Stage2] Pair {} 解析异常，安全降级为 MERGE。错误: {}", pairDO.getId(), e.getMessage());
             l2Verdict    = "MERGE";
             l2Confidence = "LOW";
@@ -288,9 +472,9 @@ public class SessionBoundaryPipelineService {
         }
 
         sessionBoundaryPairMapper.updateL2Result(
-                pairDO.getId(), l2Verdict, l2Confidence, l2Reason, finalDecision, processStatus);
-        log.info("[Stage2] Pair {} 裁决完成 -> 结果: {}, 置信度: {}, 状态: {}",
-                pairDO.getId(), l2Verdict, l2Confidence, processStatus);
+                pairDO.getId(), l2Verdict, l2Confidence, l2Reason, modelEnum.getModelName(), finalDecision, processStatus);
+        log.info("[Stage2] Pair {} L2 裁决完成 -> 结果: {}, 置信度: {}, 模型: {}, 状态: {}",
+                pairDO.getId(), l2Verdict, l2Confidence, modelEnum.getModelName(), processStatus);
     }
 
     /**

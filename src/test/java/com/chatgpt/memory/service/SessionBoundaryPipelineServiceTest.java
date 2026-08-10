@@ -10,6 +10,11 @@ import com.chatgpt.memory.model.ConversationPairDetail;
 import com.chatgpt.memory.model.VectorSegmentationResult;
 import com.chatgpt.memory.model.entity.SessionBoundaryPairDO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.output.Response;
+import com.chatgpt.memory.integration.qwen.QwenModelFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +34,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -39,18 +46,6 @@ import static org.mockito.Mockito.when;
 
 /**
  * SessionBoundaryPipelineService 三阶段流水线单元测试类
- * <p>
- * 遵守 AIR 与 BCDE 单元测试原则：
- * - A (Automatic): 全自动无交互断言
- * - I (Independent): 隔离外部 DB 与 LLM 网络依赖，使用 Mockito
- * - R (Repeatable): 可重复可预测执行
- * - B (Border): 测试 0.82 与 0.60 临界划分
- * - C (Correct): 正确路径测试
- * - D (Design): 验证三阶段解耦设计
- * - E (Error): 测试 JSON 错误与 LOW 置信度降级机制
- * </p>
- *
- * @author Antigravity
  */
 @ExtendWith(MockitoExtension.class)
 class SessionBoundaryPipelineServiceTest {
@@ -63,6 +58,12 @@ class SessionBoundaryPipelineServiceTest {
 
     @Mock
     private QwenClient qwenClient;
+
+    @Mock
+    private QwenModelFactory qwenModelFactory;
+
+    @Mock
+    private ChatLanguageModel chatLanguageModel;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -142,10 +143,11 @@ class SessionBoundaryPipelineServiceTest {
                 .processStatus(ProcessStatusEnum.PENDING.getCode())
                 .build();
 
-        when(sessionBoundaryPairMapper.selectPendingList(anyInt()))
+        when(sessionBoundaryPairMapper.selectL2ProcessList(anyBoolean(), anyLong(), anyInt()))
                 .thenReturn(List.of(pendingPair))
                 .thenReturn(Collections.emptyList());
 
+        when(qwenModelFactory.getModel(any())).thenReturn(chatLanguageModel);
         String mockQwenJson = """
                 {
                   "related": true,
@@ -154,7 +156,7 @@ class SessionBoundaryPipelineServiceTest {
                   "reason": "上文讨论 Redis 内存优化，下文追问内存满的异常处理"
                 }
                 """;
-        when(qwenClient.generateWithSystem(anyString(), anyString())).thenReturn(mockQwenJson);
+        when(chatLanguageModel.generate(any(), any(UserMessage.class))).thenReturn(Response.from(AiMessage.from(mockQwenJson)));
 
         // Act
         int processedCount = pipelineService.runStage2();
@@ -164,6 +166,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper, times(1)).updateL2Result(
                 eq(10L), eq("MERGE"), eq("HIGH"),
                 eq("上文讨论 Redis 内存优化，下文追问内存满的异常处理"),
+                eq("qwen3.6-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.DONE.getCode())
         );
     }
@@ -180,10 +183,11 @@ class SessionBoundaryPipelineServiceTest {
                 .processStatus(ProcessStatusEnum.PENDING.getCode())
                 .build();
 
-        when(sessionBoundaryPairMapper.selectPendingList(anyInt()))
+        when(sessionBoundaryPairMapper.selectL2ProcessList(anyBoolean(), anyLong(), anyInt()))
                 .thenReturn(List.of(pendingPair))
                 .thenReturn(Collections.emptyList());
 
+        when(qwenModelFactory.getModel(any())).thenReturn(chatLanguageModel);
         String lowConfidenceJson = """
                 {
                   "related": false,
@@ -192,7 +196,7 @@ class SessionBoundaryPipelineServiceTest {
                   "reason": "信息较少，无法确定关联性"
                 }
                 """;
-        when(qwenClient.generateWithSystem(anyString(), anyString())).thenReturn(lowConfidenceJson);
+        when(chatLanguageModel.generate(any(), any(UserMessage.class))).thenReturn(Response.from(AiMessage.from(lowConfidenceJson)));
 
         // Act
         int processedCount = pipelineService.runStage2();
@@ -202,6 +206,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper).updateL2Result(
                 eq(20L), eq("SPLIT"), eq("LOW"),
                 eq("信息较少，无法确定关联性"),
+                eq("qwen3.6-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode())
         );
     }
@@ -218,11 +223,12 @@ class SessionBoundaryPipelineServiceTest {
                 .processStatus(ProcessStatusEnum.PENDING.getCode())
                 .build();
 
-        when(sessionBoundaryPairMapper.selectPendingList(anyInt()))
+        when(sessionBoundaryPairMapper.selectL2ProcessList(anyBoolean(), anyLong(), anyInt()))
                 .thenReturn(List.of(pendingPair))
                 .thenReturn(Collections.emptyList());
 
-        when(qwenClient.generateWithSystem(anyString(), anyString())).thenReturn("Invalid JSON text");
+        when(qwenModelFactory.getModel(any())).thenReturn(chatLanguageModel);
+        when(chatLanguageModel.generate(any(), any(UserMessage.class))).thenReturn(Response.from(AiMessage.from("Invalid JSON text")));
 
         // Act
         int processedCount = pipelineService.runStage2();
@@ -232,6 +238,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper).updateL2Result(
                 eq(30L), eq("MERGE"), eq("LOW"),
                 anyString(),
+                eq("qwen3.6-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode())
         );
     }

@@ -34,6 +34,9 @@ chat:
     l1-high-threshold: 0.82  # 极严格强相关门限 (>= 0.82 允许直接合并)
     l1-low-threshold: 0.60   # 跨主题切断门限 (< 0.60 强制打断)
     short-text-min-length: 30 # 提高短句判定阈值为 30 字，使“那为什么还是不行呢”(9字)等追问自动拼接上文 Chunk
+    l2-auto-run-enabled: false # 设置为 false，禁止应用启动时自动跑 L2，改为通过页面按钮手动触发
+    l2-auto-run-limit: 100    # 定量记录数上限（由页面输入框参数覆盖控制）
+    l2-force-overwrite: true  # 覆盖推导开关
   parser:
     retain-roles:
       - user

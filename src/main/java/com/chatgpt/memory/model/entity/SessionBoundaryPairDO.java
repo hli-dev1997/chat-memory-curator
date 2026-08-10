@@ -137,6 +137,12 @@ public class SessionBoundaryPairDO {
     private String l2Reason;
 
     /**
+     * L2 调用的大模型名称（例如 qwen3.6-flash, qwen3.5-omni-flash, qwen3.5-omni-plus 等）
+     */
+    @Schema(description = "L2 调用的大模型名称", example = "qwen3.6-flash")
+    private String l2Model;
+
+    /**
      * L1 人工核对状态（UNCHECKED / PASSED / OVERRIDDEN）
      */
     @Schema(description = "L1 人工核对状态", example = "PASSED")

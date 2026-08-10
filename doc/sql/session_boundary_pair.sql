@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `session_boundary_pair` (
   `l2_verdict`             VARCHAR(16)  DEFAULT NULL COMMENT 'L2 千问大模型裁决（MERGE / SPLIT），仅 FUZZY 区需要，绿区/红区留空',
   `l2_confidence`          VARCHAR(16)  DEFAULT NULL COMMENT 'L2 置信度（HIGH / MEDIUM / LOW）',
   `l2_reason`              VARCHAR(512) DEFAULT NULL COMMENT 'L2 裁决推导说明（一句话，方便人工核查）',
+  `l2_model`               VARCHAR(64)  DEFAULT NULL COMMENT 'L2 调用的 AI 大模型名称（例如 qwen3.6-flash / qwen3.5-omni-flash / qwen3.5-omni-plus）',
   `l1_audit_status`        VARCHAR(16)  NOT NULL DEFAULT 'UNCHECKED' COMMENT 'L1 人工核对状态（UNCHECKED：未核对 / PASSED：认可初判 / OVERRIDDEN：推翻修改）',
   `l1_audit_verdict`       VARCHAR(16)  DEFAULT NULL COMMENT 'L1 人工判定结论（MERGE / SPLIT）',
   `l1_audit_time`          DATETIME     DEFAULT NULL COMMENT 'L1 人工核对时间戳',

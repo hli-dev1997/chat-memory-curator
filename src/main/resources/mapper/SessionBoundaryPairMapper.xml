@@ -24,6 +24,7 @@
         <result property="l2Verdict"            column="l2_verdict" />
         <result property="l2Confidence"         column="l2_confidence" />
         <result property="l2Reason"             column="l2_reason" />
+        <result property="l2Model"              column="l2_model" />
         <result property="l1AuditStatus"        column="l1_audit_status" />
         <result property="l1AuditVerdict"       column="l1_audit_verdict" />
         <result property="l1AuditTime"          column="l1_audit_time" />
@@ -59,6 +60,7 @@
           `l2_verdict`             VARCHAR(16)  DEFAULT NULL COMMENT 'L2 裁决（MERGE / SPLIT），仅 FUZZY 区有值',
           `l2_confidence`          VARCHAR(16)  DEFAULT NULL COMMENT 'L2 置信度（HIGH / MEDIUM / LOW）',
           `l2_reason`              VARCHAR(512) DEFAULT NULL COMMENT 'L2 裁决推导说明',
+          `l2_model`               VARCHAR(64)  DEFAULT NULL COMMENT 'L2 调用的 AI 大模型名称',
           `l1_audit_status`        VARCHAR(16)  NOT NULL DEFAULT 'UNCHECKED' COMMENT 'L1 人工核对状态',
           `l1_audit_verdict`       VARCHAR(16)  DEFAULT NULL COMMENT 'L1 人工判定结论',
           `l1_audit_time`          DATETIME     DEFAULT NULL COMMENT 'L1 人工核对时间戳',
@@ -78,6 +80,12 @@
           KEY `idx_has_attachment` (`has_attachment`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
           COMMENT='会话切分消息边界决策过程表';
+    </update>
+
+    <!-- 动态平滑补全 l2_model 列（用于旧数据表升级兼容） -->
+    <update id="addColumnL2ModelIfNotExists">
+        ALTER TABLE `session_boundary_pair`
+        ADD COLUMN `l2_model` VARCHAR(64) DEFAULT NULL COMMENT 'L2 调用的 AI 大模型名称';
     </update>
 
     <!-- =====================================================================
@@ -144,8 +152,24 @@
         LIMIT #{limit}
     </select>
 
+    <!-- Stage 2：扫描待推导的 Pair 记录（支持游标分页、增量与全量覆盖，始终保护人工手动覆写状态） -->
+    <select id="selectL2ProcessList" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `l1_zone` = 'FUZZY'
+          AND `process_status` != 'MANUAL_OVERRIDE'
+        <if test="lastId != null and lastId > 0">
+          AND `id` &gt; #{lastId}
+        </if>
+        <if test="!forceOverwrite">
+          AND `l2_verdict` IS NULL
+        </if>
+        ORDER BY `id` ASC
+        LIMIT #{limit}
+    </select>
+
     <!-- =====================================================================
-         Stage 2：回填 L2 裁决结果（更新 l2 字段 + final_decision + process_status）
+         Stage 2：回填 L2 裁决结果（更新 l2 字段 + final_decision + process_status + update_time）
          ===================================================================== -->
     <update id="updateL2Result">
         UPDATE `session_boundary_pair`
@@ -153,8 +177,10 @@
             `l2_verdict`     = #{l2Verdict},
             `l2_confidence`  = #{l2Confidence},
             `l2_reason`      = #{l2Reason},
+            `l2_model`       = #{l2Model},
             `final_decision` = #{finalDecision},
-            `process_status` = #{processStatus}
+            `process_status` = #{processStatus},
+            `update_time`    = CURRENT_TIMESTAMP
         WHERE `id` = #{id}
     </update>
 
@@ -169,7 +195,8 @@
             `l1_audit_time`    = CURRENT_TIMESTAMP,
             `final_decision`   = #{finalDecision},
             `manual_remark`    = #{manualRemark},
-            `process_status`   = 'MANUAL_OVERRIDE'
+            `process_status`   = 'MANUAL_OVERRIDE',
+            `update_time`      = CURRENT_TIMESTAMP
         WHERE `id` = #{id}
     </update>
 
@@ -184,7 +211,8 @@
             `l2_audit_time`    = CURRENT_TIMESTAMP,
             `final_decision`   = #{finalDecision},
             `manual_remark`    = #{manualRemark},
-            `process_status`   = 'MANUAL_OVERRIDE'
+            `process_status`   = 'MANUAL_OVERRIDE',
+            `update_time`      = CURRENT_TIMESTAMP
         WHERE `id` = #{id}
     </update>
 
@@ -194,10 +222,84 @@
         SET
             `message_a_text` = #{messageAText},
             `message_b_text` = #{messageBText},
-            `has_attachment` = #{hasAttachment}
+            `has_attachment` = #{hasAttachment},
+            `update_time`    = CURRENT_TIMESTAMP
         WHERE `parent_conversation_id` = #{parentConversationId}
           AND `pair_index` = #{pairIndex}
     </update>
+
+    <!-- =====================================================================
+         条件分页查询已完成 L2 大模型精排裁决的 Pair 记录
+         ===================================================================== -->
+    <select id="selectL2Records" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `l2_verdict` IS NOT NULL
+        <if test="hasAttachment != null">
+            AND `has_attachment` = #{hasAttachment}
+        </if>
+        <if test="processStatus != null and processStatus != ''">
+            AND `process_status` = #{processStatus}
+        </if>
+        <if test="l2Verdict != null and l2Verdict != ''">
+            AND `l2_verdict` = #{l2Verdict}
+        </if>
+        <if test="l2Confidence != null and l2Confidence != ''">
+            AND `l2_confidence` = #{l2Confidence}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                `parent_conversation_id` LIKE CONCAT('%', #{keyword}, '%')
+                OR `message_a_text` LIKE CONCAT('%', #{keyword}, '%')
+                OR `message_b_text` LIKE CONCAT('%', #{keyword}, '%')
+                OR `l2_reason` LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY `update_time` DESC, `id` ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 统计匹配条件的 L2 记录条数 -->
+    <select id="countL2Records" resultType="int">
+        SELECT COUNT(1)
+        FROM `session_boundary_pair`
+        WHERE `l2_verdict` IS NOT NULL
+        <if test="hasAttachment != null">
+            AND `has_attachment` = #{hasAttachment}
+        </if>
+        <if test="processStatus != null and processStatus != ''">
+            AND `process_status` = #{processStatus}
+        </if>
+        <if test="l2Verdict != null and l2Verdict != ''">
+            AND `l2_verdict` = #{l2Verdict}
+        </if>
+        <if test="l2Confidence != null and l2Confidence != ''">
+            AND `l2_confidence` = #{l2Confidence}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                `parent_conversation_id` LIKE CONCAT('%', #{keyword}, '%')
+                OR `message_a_text` LIKE CONCAT('%', #{keyword}, '%')
+                OR `message_b_text` LIKE CONCAT('%', #{keyword}, '%')
+                OR `l2_reason` LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </select>
+
+    <!-- 统计 FUZZY 模糊区与 L2 待处理/已处理全维度指标看板数据 -->
+    <select id="selectL2SummaryStats" resultType="map">
+        SELECT
+            COUNT(1) AS totalFuzzy,
+            SUM(CASE WHEN `has_attachment` = 1 THEN 1 ELSE 0 END) AS totalFuzzyImages,
+            SUM(CASE WHEN `has_attachment` = 0 THEN 1 ELSE 0 END) AS totalFuzzyText,
+            SUM(CASE WHEN `l2_verdict` IS NOT NULL THEN 1 ELSE 0 END) AS totalJudged,
+            SUM(CASE WHEN `l2_verdict` IS NULL THEN 1 ELSE 0 END) AS totalPending,
+            SUM(CASE WHEN `l2_verdict` = 'MERGE' THEN 1 ELSE 0 END) AS totalMerge,
+            SUM(CASE WHEN `l2_verdict` = 'SPLIT' THEN 1 ELSE 0 END) AS totalSplit,
+            SUM(CASE WHEN `process_status` = 'NEED_MANUAL_REVIEW' THEN 1 ELSE 0 END) AS totalReview
+        FROM `session_boundary_pair`
+        WHERE `l1_zone` = 'FUZZY'
+    </select>
 
     <!-- =====================================================================
          人工抽查：按 L1 大区 + 得分范围精准检索高危临界 Pair

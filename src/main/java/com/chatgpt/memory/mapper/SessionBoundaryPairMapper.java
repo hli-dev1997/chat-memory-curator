@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * session_boundary_pair 数据库表 MyBatis 映射 Mapper 接口
@@ -28,6 +29,11 @@ public interface SessionBoundaryPairMapper {
      * 初始化建表（若不存在）
      */
     void createTableIfNotExists();
+
+    /**
+     * 动态平滑补全 l2_model 列（用于旧数据表升级兼容）
+     */
+    void addColumnL2ModelIfNotExists();
 
     /**
      * 批量插入 Pair 记录（Stage 1 落库使用）
@@ -54,12 +60,67 @@ public interface SessionBoundaryPairMapper {
     List<SessionBoundaryPairDO> selectPendingList(@Param("limit") int limit);
 
     /**
+     * 查询 Stage 2 待处理的 Pair 列表（支持游标分页、增量推导与全量覆盖重推导）
+     *
+     * @param forceOverwrite 是否强行覆盖已有的 L2 裁决记录（true：抓取全量 FUZZY 区 Pair；false：仅抓取未裁决的 FUZZY 区 Pair）
+     * @param lastId         上一批最后一条 Pair 的 ID（0L 表示从头开始）
+     * @param limit          每批拉取的最大条数
+     * @return 待推导的 Pair 列表
+     */
+    List<SessionBoundaryPairDO> selectL2ProcessList(
+            @Param("forceOverwrite") boolean forceOverwrite,
+            @Param("lastId") Long lastId,
+            @Param("limit") int limit
+    );
+
+    /**
+     * 条件分页查询已完成 L2 大模型精排的 Pair 记录
+     *
+     * @param hasAttachment  是否有附件（null 不限，1有图，0无图）
+     * @param processStatus  处理状态（null 不限）
+     * @param l2Verdict      L2 裁决结论（null 不限，MERGE / SPLIT）
+     * @param l2Confidence   置信度（null 不限，HIGH / MEDIUM / LOW）
+     * @param keyword        关键词搜索（可为空）
+     * @param offset         偏移量
+     * @param limit          拉取条数
+     * @return L2 裁决记录列表
+     */
+    List<SessionBoundaryPairDO> selectL2Records(
+            @Param("hasAttachment") Integer hasAttachment,
+            @Param("processStatus") String processStatus,
+            @Param("l2Verdict") String l2Verdict,
+            @Param("l2Confidence") String l2Confidence,
+            @Param("keyword") String keyword,
+            @Param("offset") int offset,
+            @Param("limit") int limit
+    );
+
+    /**
+     * 统计匹配条件的 L2 裁决记录条数
+     */
+    int countL2Records(
+            @Param("hasAttachment") Integer hasAttachment,
+            @Param("processStatus") String processStatus,
+            @Param("l2Verdict") String l2Verdict,
+            @Param("l2Confidence") String l2Confidence,
+            @Param("keyword") String keyword
+    );
+
+    /**
+     * 统计 FUZZY 模糊区与 L2 待处理/已处理总指标看板数据
+     *
+     * @return 包含 totalFuzzy, totalFuzzyImages, totalFuzzyText, totalJudged, totalPending, totalMerge, totalSplit, totalReview 的 Map
+     */
+    Map<String, Object> selectL2SummaryStats();
+
+    /**
      * 回填 L2 裁决结果（Stage 2 裁决完成后更新）
      *
      * @param id            主键 ID
      * @param l2Verdict     L2 裁决（MERGE / SPLIT）
      * @param l2Confidence  L2 置信度（HIGH / MEDIUM / LOW）
      * @param l2Reason      L2 裁决依据说明
+     * @param l2Model       L2 调用的大模型名称
      * @param finalDecision 最终决策（等于 l2Verdict）
      * @param processStatus 处理状态（DONE / NEED_MANUAL_REVIEW）
      * @return 影响行数
@@ -69,6 +130,7 @@ public interface SessionBoundaryPairMapper {
             @Param("l2Verdict") String l2Verdict,
             @Param("l2Confidence") String l2Confidence,
             @Param("l2Reason") String l2Reason,
+            @Param("l2Model") String l2Model,
             @Param("finalDecision") String finalDecision,
             @Param("processStatus") String processStatus
     );

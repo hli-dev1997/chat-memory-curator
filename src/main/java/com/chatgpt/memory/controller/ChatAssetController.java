@@ -50,12 +50,24 @@ public class ChatAssetController {
             return buildFileResponse(file);
         }
 
-        // 3. 动态前缀模糊搜索匹配磁盘衍生文件（例如 file_xxx -> file_xxx-sanitized.jpg 或 file-xxx-image.png）
-        final String prefix = assetPath;
-        File[] matches = exportDir.listFiles((dir, name) -> name.startsWith(prefix));
-        if (matches != null && matches.length > 0) {
-            log.info("Asset fuzzy prefix match succeeded: [{}] -> [{}]", prefix, matches[0].getName());
-            return buildFileResponse(matches[0]);
+        // 2. 深度递归检索导出目录下的所有子目录（包含对话 ID 子目录、audio 目录等）
+        final String searchPrefix = assetPath;
+        try (var stream = Files.walk(exportDir.toPath())) {
+            var match = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String fileName = p.getFileName().toString();
+                        return fileName.equalsIgnoreCase(searchPrefix) || fileName.startsWith(searchPrefix);
+                    })
+                    .findFirst();
+
+            if (match.isPresent()) {
+                File matchedFile = match.get().toFile();
+                log.info("Asset recursive match succeeded: [{}] -> [{}]", assetPath, matchedFile.getAbsolutePath());
+                return buildFileResponse(matchedFile);
+            }
+        } catch (IOException e) {
+            log.error("Error walking export directory for assetPath: {}", assetPath, e);
         }
 
         log.warn("Asset file not found on disk, returning placeholder: assetPath={}", assetPath);

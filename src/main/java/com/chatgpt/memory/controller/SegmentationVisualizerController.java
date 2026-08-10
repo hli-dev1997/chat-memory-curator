@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 类说明 / Class Description:
@@ -101,6 +103,64 @@ public class SegmentationVisualizerController {
             log.error("Failed to preprocess all conversations", e);
             return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "预处理失败: " + e.getMessage()));
         }
+    }
+
+    /**
+     * 触发全量 Stage 2 千问大模型精排裁决（异步执行）
+     * <p>支持选择文本与多模态模型名称，并支持强行覆盖重推导。</p>
+     */
+    @PostMapping("/run-stage2")
+    @Operation(summary = "触发 Stage 2 千问大模型精排裁决", description = "后台异步启动 Stage 2 任务，支持指定文本/多模态模型、是否覆盖重写已裁决记录以及定量上限限制")
+    public ResponseEntity<Map<String, Object>> runStage2(
+            @Parameter(description = "自定义纯文本模型（枚举名如 QWEN_TEXT_FLASH 或模型名如 qwen3.6-flash）", example = "QWEN_TEXT_FLASH")
+            @RequestParam(required = false) final String textModel,
+            @Parameter(description = "自定义多模态模型（枚举名如 QWEN_OMNI_PLUS 或模型名如 qwen3.5-omni-plus）", example = "QWEN_OMNI_PLUS")
+            @RequestParam(required = false) final String multimodalModel,
+            @Parameter(description = "是否强行覆盖重推导已有记录（true是/false否）", example = "false")
+            @RequestParam(defaultValue = "false") final boolean forceOverwrite,
+            @Parameter(description = "定量处理最大条数上限（0表示全量，例如指定100条）", example = "100")
+            @RequestParam(defaultValue = "0") final int maxCount) {
+
+        final com.chatgpt.memory.common.enums.LlmModelEnum textEnum = parseModelEnum(textModel);
+        final com.chatgpt.memory.common.enums.LlmModelEnum omniEnum = parseModelEnum(multimodalModel);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("[Controller] 开始异步触发 Stage 2 任务 | textModel: {}, omniModel: {}, forceOverwrite: {}, maxCount: {}",
+                        textEnum != null ? textEnum.getModelName() : "DEFAULT",
+                        omniEnum != null ? omniEnum.getModelName() : "DEFAULT",
+                        forceOverwrite, maxCount > 0 ? maxCount : "UNLIMITED");
+                final int processed = sessionBoundaryPipelineService.runStage2(textEnum, omniEnum, forceOverwrite, maxCount);
+                log.info("[Controller] 异步 Stage 2 任务顺利完成，共精排 {} 条 Pair。", processed);
+            } catch (Exception e) {
+                log.error("[Controller] 异步 Stage 2 任务执行异常", e);
+            }
+        });
+
+        return ResponseEntity.ok(Map.of(
+                "code", 200,
+                "message", String.format("L2 精排任务已异步启动！文本模型: %s，多模态模型: %s，强制覆盖模式: %s，目标上限: %s 条。",
+                        textEnum != null ? textEnum.getModelName() : "qwen3.6-flash(默认)",
+                        omniEnum != null ? omniEnum.getModelName() : "qwen3.5-omni-flash(默认)",
+                        forceOverwrite,
+                        maxCount > 0 ? maxCount : "全量")
+        ));
+    }
+
+    /**
+     * 字符串解析映射为 LlmModelEnum 枚举项
+     */
+    private com.chatgpt.memory.common.enums.LlmModelEnum parseModelEnum(final String modelStr) {
+        if (modelStr == null || modelStr.isBlank()) {
+            return null;
+        }
+        final String trimmed = modelStr.trim();
+        for (final com.chatgpt.memory.common.enums.LlmModelEnum model : com.chatgpt.memory.common.enums.LlmModelEnum.values()) {
+            if (model.name().equalsIgnoreCase(trimmed) || model.getModelName().equalsIgnoreCase(trimmed)) {
+                return model;
+            }
+        }
+        return null;
     }
 
     /**
@@ -389,8 +449,62 @@ public class SegmentationVisualizerController {
                 return ResponseEntity.badRequest().body(Map.of("code", 404, "message", "未找到指定 pairId: " + pairId));
             }
         } catch (Exception e) {
-            log.error("Failed to persist audit for pairId: {}", pairId, e);
-            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "复核写库失败: " + e.getMessage()));
+            log.error("[Audit] 提交人工复核发生异常", e);
+            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "系统内部错误: " + e.getMessage()));
         }
+    }
+
+    /**
+     * 条件分页获取 L2 大模型已审核落表记录列表
+     */
+    @GetMapping("/l2-records")
+    @Operation(summary = "条件分页获取 L2 大模型精排裁决落表记录列表", description = "支持按附件有无、处理状态、裁决结论、置信度及关键字过滤检索")
+    public ResponseEntity<Map<String, Object>> getL2Records(
+            @RequestParam(defaultValue = "1") final int page,
+            @RequestParam(defaultValue = "20") final int pageSize,
+            @RequestParam(required = false) final Integer hasAttachment,
+            @RequestParam(required = false) final String processStatus,
+            @RequestParam(required = false) final String l2Verdict,
+            @RequestParam(required = false) final String l2Confidence,
+            @RequestParam(required = false) final String keyword) {
+
+        final int safePage = Math.max(1, page);
+        final int safePageSize = Math.min(100, Math.max(1, pageSize));
+        final int offset = (safePage - 1) * safePageSize;
+
+        final String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+        final String cleanStatus = (processStatus != null && !processStatus.trim().isEmpty()) ? processStatus.trim() : null;
+        final String cleanVerdict = (l2Verdict != null && !l2Verdict.trim().isEmpty()) ? l2Verdict.trim() : null;
+        final String cleanConfidence = (l2Confidence != null && !l2Confidence.trim().isEmpty()) ? l2Confidence.trim() : null;
+
+        final List<SessionBoundaryPairDO> list = sessionBoundaryPairMapper.selectL2Records(
+                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanKeyword, offset, safePageSize
+        );
+        final int total = sessionBoundaryPairMapper.countL2Records(
+                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanKeyword
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "code", 200,
+                "message", "获取成功",
+                "page", safePage,
+                "pageSize", safePageSize,
+                "total", total,
+                "list", list
+        ));
+    }
+
+    /**
+     * 获取 L2 大模型裁决统计指标看板数据
+     */
+    @GetMapping("/l2-stats")
+    @Operation(summary = "获取 L2 大模型精排裁决统计指标看板", description = "提供 FUZZY 模糊区总数、多模态图文数、纯文本数、已精排数、剩余未处理数、MERGE/SPLIT 与待复核数")
+    public ResponseEntity<Map<String, Object>> getL2Stats() {
+        final Map<String, Object> stats = sessionBoundaryPairMapper.selectL2SummaryStats();
+        return ResponseEntity.ok(Map.of(
+                "code", 200,
+                "message", "获取成功",
+                "stats", stats != null ? stats : Map.of()
+        ));
     }
 }
