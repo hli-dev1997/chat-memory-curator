@@ -68,10 +68,10 @@
             min-height: 100vh;
         }
 
-        /* 顶部导航与看板 Header */
+        /* 顶部导航与看板 Header (通栏全屏自适应) */
         header {
-            max-width: 1380px;
-            margin: 0 auto 24px auto;
+            width: 100%;
+            margin: 0 0 24px 0;
             background: var(--bg-card);
             padding: 24px 32px;
             border-radius: var(--radius-lg);
@@ -232,10 +232,10 @@
             color: var(--primary-hover);
         }
 
-        /* 搜索过滤控制栏 Filter Bar */
+        /* 搜索过滤控制栏 Filter Bar (通栏自适应) */
         .filter-bar {
-            max-width: 1380px;
-            margin: 0 auto 24px auto;
+            width: 100%;
+            margin: 0 0 24px 0;
             background: var(--bg-card);
             padding: 18px 24px;
             border-radius: var(--radius-lg);
@@ -281,10 +281,10 @@
             min-width: 240px;
         }
 
-        /* 主列表 View Content */
+        /* 主列表 View Content (通栏自适应) */
         main {
-            max-width: 1380px;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0 0 24px 0;
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -486,6 +486,84 @@
             margin: 8px 0;
             border: 1px solid var(--border-color);
             display: block;
+            cursor: zoom-in;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .chunk-body img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 16px rgba(180, 83, 9, 0.2);
+        }
+
+        /* 全屏图片大图预览 Modal Lightbox */
+        .image-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(28, 25, 23, 0.88);
+            backdrop-filter: blur(6px);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .image-modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .image-modal-container {
+            position: relative;
+            max-width: 92vw;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-modal-img {
+            max-width: 92vw;
+            max-height: 82vh;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            border: 2px solid #fde68a;
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: -42px;
+            right: 0;
+            color: #ffffff;
+            font-size: 26px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.15);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .image-modal-close:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .image-modal-caption {
+            margin-top: 12px;
+            color: #fef3c7;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            text-align: center;
         }
 
         /* 卡片底部操作栏 Card Footer */
@@ -531,10 +609,10 @@
         }
         .btn-override-split:hover { background: #fecaca; }
 
-        /* 分页控件 Pagination */
+        /* 分页控件 Pagination (通栏自适应) */
         .pagination-container {
-            max-width: 1380px;
-            margin: 24px auto;
+            width: 100%;
+            margin: 24px 0 0 0;
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
@@ -725,6 +803,15 @@
         </div>
     </div>
 
+    <!-- 全屏大图预览 Lightbox Modal -->
+    <div id="imageModal" class="image-modal-overlay" onclick="closeImageModal(event)">
+        <div class="image-modal-container" onclick="event.stopPropagation()">
+            <div class="image-modal-close" onclick="closeImageModal()">&times;</div>
+            <img id="imageModalImg" class="image-modal-img" src="" alt="大图预览">
+            <div id="imageModalCaption" class="image-modal-caption"></div>
+        </div>
+    </div>
+
     <script>
         let currentPage = 1;
         let totalRecords = 0;
@@ -733,7 +820,43 @@
             updateButtonTexts();
             loadStats();
             loadRecords();
+
+            // 全局代理 Chunk 消息区图片的点击事件（点击图片即触发全屏放大）
+            document.addEventListener('click', (e) => {
+                if (e.target && e.target.tagName === 'IMG' && e.target.closest('.chunk-body')) {
+                    openImageModal(e.target.src, e.target.alt || e.target.title);
+                }
+            });
         });
+
+        // 打开大图预览 Modal
+        function openImageModal(imgSrc, altText) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('imageModalImg');
+            const caption = document.getElementById('imageModalCaption');
+
+            modalImg.src = imgSrc;
+            caption.innerText = (altText && !altText.startsWith('http')) ? altText : '点击遮罩空白区域或按 Esc 键退出大图预览';
+            modal.classList.add('active');
+
+            document.addEventListener('keydown', onEscKeyClose);
+        }
+
+        // 关闭大图预览 Modal
+        function closeImageModal(e) {
+            if (e && e.target && e.target.id !== 'imageModal' && !e.target.classList.contains('image-modal-close')) {
+                return;
+            }
+            const modal = document.getElementById('imageModal');
+            modal.classList.remove('active');
+            document.removeEventListener('keydown', onEscKeyClose);
+        }
+
+        function onEscKeyClose(e) {
+            if (e.key === 'Escape') {
+                closeImageModal();
+            }
+        }
 
         // 动态同步输入框条数到按钮文字中
         function updateButtonTexts() {
