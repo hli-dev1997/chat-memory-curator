@@ -325,17 +325,49 @@ public class ChatExportParser {
                 }
                 textBuilder.append(str);
             } else if (part instanceof Map<?, ?> map) {
-                // 提纯字典里的语音转写文本
+                // 提纯字典里的语音转写文本或图片 asset_pointer/file 链接
                 final Object textObj = map.get("text");
+                final Object assetPointer = map.get("asset_pointer");
+                final Object fileId = map.get("file_id");
+
                 if (textObj instanceof String str && !str.isBlank()) {
                     if (!textBuilder.isEmpty()) {
                         textBuilder.append("\n");
                     }
                     textBuilder.append(str);
+                } else if (assetPointer instanceof String pointer && !pointer.isBlank()) {
+                    if (!textBuilder.isEmpty()) {
+                        textBuilder.append("\n");
+                    }
+                    final String url = formatAssetUrl(pointer);
+                    textBuilder.append("![图片](").append(url).append(")");
+                } else if (fileId instanceof String fid && !fid.isBlank()) {
+                    if (!textBuilder.isEmpty()) {
+                        textBuilder.append("\n");
+                    }
+                    final String url = formatAssetUrl(fid);
+                    textBuilder.append("![图片](").append(url).append(")");
                 }
             }
         }
         return textBuilder.toString();
+    }
+
+    /**
+     * 将 ChatGPT 原始物理资产指针格式化为标准的 /chat-assets/ Web 路径
+     */
+    private String formatAssetUrl(final String rawPointer) {
+        if (rawPointer == null || rawPointer.isBlank()) {
+            return "";
+        }
+        String clean = rawPointer.trim();
+        if (clean.contains("://")) {
+            clean = clean.substring(clean.indexOf("://") + 3);
+        }
+        if (clean.startsWith("/")) {
+            clean = clean.substring(1);
+        }
+        return "/chat-assets/" + clean;
     }
 
     /**

@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chatgpt.memory.mapper.SessionBoundaryPairMapper">
+
+    <!-- =====================================================================
+         ResultMap：数据库下划线字段 -> Java lowerCamelCase 属性映射
+         ===================================================================== -->
+    <resultMap id="BaseResultMap" type="com.chatgpt.memory.model.entity.SessionBoundaryPairDO">
+        <id  property="id"                    column="id" />
+        <result property="parentConversationId" column="parent_conversation_id" />
+        <result property="pairIndex"            column="pair_index" />
+        <result property="messageAId"           column="message_a_id" />
+        <result property="messageBId"           column="message_b_id" />
+        <result property="messageARole"         column="message_a_role" />
+        <result property="messageBRole"         column="message_b_role" />
+        <result property="messageAText"         column="message_a_text" />
+        <result property="messageBText"         column="message_b_text" />
+        <result property="hasAttachment"        column="has_attachment" />
+        <result property="attachmentMetaA"       column="attachment_meta_a" />
+        <result property="attachmentMetaB"       column="attachment_meta_b" />
+        <result property="l1Score"              column="l1_score" />
+        <result property="l1Zone"               column="l1_zone" />
+        <result property="l2Verdict"            column="l2_verdict" />
+        <result property="l2Confidence"         column="l2_confidence" />
+        <result property="l2Reason"             column="l2_reason" />
+        <result property="l1AuditStatus"        column="l1_audit_status" />
+        <result property="l1AuditVerdict"       column="l1_audit_verdict" />
+        <result property="l1AuditTime"          column="l1_audit_time" />
+        <result property="l2AuditStatus"        column="l2_audit_status" />
+        <result property="l2AuditVerdict"       column="l2_audit_verdict" />
+        <result property="l2AuditTime"          column="l2_audit_time" />
+        <result property="manualRemark"         column="manual_remark" />
+        <result property="finalDecision"        column="final_decision" />
+        <result property="processStatus"        column="process_status" />
+        <result property="createTime"           column="create_time" />
+        <result property="updateTime"           column="update_time" />
+    </resultMap>
+
+    <!-- =====================================================================
+         建表 DDL（若不存在则建，幂等执行）
+         ===================================================================== -->
+    <update id="createTableIfNotExists">
+        CREATE TABLE IF NOT EXISTS `session_boundary_pair` (
+          `id`                     BIGINT       NOT NULL AUTO_INCREMENT COMMENT '自增主键 ID',
+          `parent_conversation_id` VARCHAR(128) NOT NULL COMMENT '所属原始对话 ID（关联 chat_session.parent_conversation_id）',
+          `pair_index`             INT          NOT NULL COMMENT '对话内 Pair 顺序序号（1-indexed，保证顺序性）',
+          `message_a_id`           VARCHAR(128) NOT NULL DEFAULT '' COMMENT '前一条消息 ID 或内容哈希',
+          `message_b_id`           VARCHAR(128) NOT NULL DEFAULT '' COMMENT '后一条消息 ID 或内容哈希',
+          `message_a_role`         VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '前一条消息角色（user / assistant）',
+          `message_b_role`         VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '后一条消息角色（user / assistant）',
+          `message_a_text`         TEXT         NOT NULL COMMENT '前一条消息完整文本正文（含 Markdown 图片与文本）',
+          `message_b_text`         TEXT         NOT NULL COMMENT '后一条消息完整文本正文（含 Markdown 图片与文本）',
+          `has_attachment`         TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '是否包含图片或文件附件（1是/0否）',
+          `attachment_meta_a`      TEXT         DEFAULT NULL COMMENT '消息 A 关联的全量附件元数据列表（JSON 数组）',
+          `attachment_meta_b`      TEXT         DEFAULT NULL COMMENT '消息 B 关联的全量附件元数据列表（JSON 数组）',
+          `l1_score`               DECIMAL(6,4) NOT NULL COMMENT 'L1 BGE 向量余弦相似度得分',
+          `l1_zone`                VARCHAR(16)  NOT NULL COMMENT 'L1 大区（GREEN_MERGE / FUZZY / RED_SPLIT）',
+          `l2_verdict`             VARCHAR(16)  DEFAULT NULL COMMENT 'L2 裁决（MERGE / SPLIT），仅 FUZZY 区有值',
+          `l2_confidence`          VARCHAR(16)  DEFAULT NULL COMMENT 'L2 置信度（HIGH / MEDIUM / LOW）',
+          `l2_reason`              VARCHAR(512) DEFAULT NULL COMMENT 'L2 裁决推导说明',
+          `l1_audit_status`        VARCHAR(16)  NOT NULL DEFAULT 'UNCHECKED' COMMENT 'L1 人工核对状态',
+          `l1_audit_verdict`       VARCHAR(16)  DEFAULT NULL COMMENT 'L1 人工判定结论',
+          `l1_audit_time`          DATETIME     DEFAULT NULL COMMENT 'L1 人工核对时间戳',
+          `l2_audit_status`        VARCHAR(16)  NOT NULL DEFAULT 'UNCHECKED' COMMENT 'L2 人工核对状态',
+          `l2_audit_verdict`       VARCHAR(16)  DEFAULT NULL COMMENT 'L2 人工判定结论',
+          `l2_audit_time`          DATETIME     DEFAULT NULL COMMENT 'L2 人工核对时间戳',
+          `manual_remark`          VARCHAR(256) DEFAULT NULL COMMENT '人工复核备注说明',
+          `final_decision`         VARCHAR(16)  DEFAULT NULL COMMENT '最终决策（MERGE / SPLIT）',
+          `process_status`         VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT '处理状态（PENDING / DONE / NEED_MANUAL_REVIEW）',
+          `create_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+          `update_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `uk_conv_pair` (`parent_conversation_id`, `pair_index`),
+          KEY `idx_parent_conv_id` (`parent_conversation_id`),
+          KEY `idx_process_status` (`process_status`),
+          KEY `idx_l1_zone_score` (`l1_zone`, `l1_score`),
+          KEY `idx_has_attachment` (`has_attachment`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+          COMMENT='会话切分消息边界决策过程表';
+    </update>
+
+    <!-- =====================================================================
+         Stage 1：批量插入 Pair 记录（L1 向量计算结果一次性落库）
+         使用 INSERT IGNORE 防止重跑时因 uk_conv_pair 冲突报错
+         ===================================================================== -->
+    <insert id="batchInsert">
+        INSERT IGNORE INTO `session_boundary_pair` (
+            `parent_conversation_id`,
+            `pair_index`,
+            `message_a_id`,
+            `message_b_id`,
+            `message_a_role`,
+            `message_b_role`,
+            `message_a_text`,
+            `message_b_text`,
+            `has_attachment`,
+            `attachment_meta_a`,
+            `attachment_meta_b`,
+            `l1_score`,
+            `l1_zone`,
+            `final_decision`,
+            `process_status`
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.parentConversationId},
+                #{item.pairIndex},
+                #{item.messageAId},
+                #{item.messageBId},
+                #{item.messageARole},
+                #{item.messageBRole},
+                #{item.messageAText},
+                #{item.messageBText},
+                #{item.hasAttachment},
+                #{item.attachmentMetaA},
+                #{item.attachmentMetaB},
+                #{item.l1Score},
+                #{item.l1Zone},
+                #{item.finalDecision},
+                #{item.processStatus}
+            )
+        </foreach>
+    </insert>
+
+    <!-- =====================================================================
+         Stage 3：按对话 ID 查询全量 Pair（必须按 pair_index 升序，保证顺序性）
+         ===================================================================== -->
+    <select id="selectByConvId" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `parent_conversation_id` = #{parentConversationId}
+        ORDER BY `pair_index` ASC
+    </select>
+
+    <!-- =====================================================================
+         Stage 2：扫描 PENDING 状态的 Pair（分批拉取，防止一次性拉取量过大）
+         ===================================================================== -->
+    <select id="selectPendingList" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `process_status` = 'PENDING'
+        ORDER BY `id` ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- =====================================================================
+         Stage 2：回填 L2 裁决结果（更新 l2 字段 + final_decision + process_status）
+         ===================================================================== -->
+    <update id="updateL2Result">
+        UPDATE `session_boundary_pair`
+        SET
+            `l2_verdict`     = #{l2Verdict},
+            `l2_confidence`  = #{l2Confidence},
+            `l2_reason`      = #{l2Reason},
+            `final_decision` = #{finalDecision},
+            `process_status` = #{processStatus}
+        WHERE `id` = #{id}
+    </update>
+
+    <!-- =====================================================================
+         回填 L1 人工核验结果
+         ===================================================================== -->
+    <update id="updateL1AuditResult">
+        UPDATE `session_boundary_pair`
+        SET
+            `l1_audit_status`  = #{l1AuditStatus},
+            `l1_audit_verdict` = #{l1AuditVerdict},
+            `l1_audit_time`    = CURRENT_TIMESTAMP,
+            `final_decision`   = #{finalDecision},
+            `manual_remark`    = #{manualRemark},
+            `process_status`   = 'MANUAL_OVERRIDE'
+        WHERE `id` = #{id}
+    </update>
+
+    <!-- =====================================================================
+         回填 L2 人工核验结果
+         ===================================================================== -->
+    <update id="updateL2AuditResult">
+        UPDATE `session_boundary_pair`
+        SET
+            `l2_audit_status`  = #{l2AuditStatus},
+            `l2_audit_verdict` = #{l2AuditVerdict},
+            `l2_audit_time`    = CURRENT_TIMESTAMP,
+            `final_decision`   = #{finalDecision},
+            `manual_remark`    = #{manualRemark},
+            `process_status`   = 'MANUAL_OVERRIDE'
+        WHERE `id` = #{id}
+    </update>
+
+    <!-- 更新消息正文文本与附件标记 -->
+    <update id="updatePairTextAndAttachment">
+        UPDATE `session_boundary_pair`
+        SET
+            `message_a_text` = #{messageAText},
+            `message_b_text` = #{messageBText},
+            `has_attachment` = #{hasAttachment}
+        WHERE `parent_conversation_id` = #{parentConversationId}
+          AND `pair_index` = #{pairIndex}
+    </update>
+
+    <!-- =====================================================================
+         人工抽查：按 L1 大区 + 得分范围精准检索高危临界 Pair
+         典型用法：
+           红区临界 -> l1Zone=RED_SPLIT, scoreMin=0.5500, scoreMax=0.5999
+           绿区临界 -> l1Zone=GREEN_MERGE, scoreMin=0.8200, scoreMax=0.8600
+         ===================================================================== -->
+    <select id="selectByZoneAndScoreRange" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `l1_zone` = #{l1Zone}
+          AND `l1_score` BETWEEN #{scoreMin} AND #{scoreMax}
+        ORDER BY `l1_score` DESC
+    </select>
+
+    <!-- =====================================================================
+         流式连续审核：获取 l1_audit_status = 'UNCHECKED' 的未审核记录流
+         ===================================================================== -->
+    <select id="selectUncheckedStream" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `l1_audit_status` = 'UNCHECKED'
+        <if test="l1Zone != null and l1Zone != ''">
+            AND `l1_zone` = #{l1Zone}
+        </if>
+        <if test="hasAttachment != null">
+            AND `has_attachment` = #{hasAttachment}
+        </if>
+        ORDER BY `id` ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 统计未审核记录条数 -->
+    <select id="countUnchecked" resultType="long">
+        SELECT COUNT(1)
+        FROM `session_boundary_pair`
+        WHERE `l1_audit_status` = 'UNCHECKED'
+        <if test="l1Zone != null and l1Zone != ''">
+            AND `l1_zone` = #{l1Zone}
+        </if>
+        <if test="hasAttachment != null">
+            AND `has_attachment` = #{hasAttachment}
+        </if>
+    </select>
+
+    <!-- 统计已审核记录条数 -->
+    <select id="countAudited" resultType="long">
+        SELECT COUNT(1)
+        FROM `session_boundary_pair`
+        WHERE `l1_audit_status` != 'UNCHECKED'
+    </select>
+
+    <!-- 按更新时间倒序获取已完成核对的历史 Pair 记录流 -->
+    <select id="selectAuditedHistory" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `l1_audit_status` != 'UNCHECKED'
+        ORDER BY `l1_audit_time` DESC, `update_time` DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- =====================================================================
+         人工复核队列：查询 NEED_MANUAL_REVIEW 状态的 Pair
+         ===================================================================== -->
+    <select id="selectNeedManualReviewList" resultMap="BaseResultMap">
+        SELECT *
+        FROM `session_boundary_pair`
+        WHERE `process_status` = 'NEED_MANUAL_REVIEW'
+        ORDER BY `id` ASC
+    </select>
+
+    <!-- 查询记录总条数 -->
+    <select id="count" resultType="long">
+        SELECT COUNT(1) FROM `session_boundary_pair`
+    </select>
+
+</mapper>

@@ -43,17 +43,25 @@ import java.util.Objects;
  * @author Antigravity
  * @since 1.0.0
  */
+import com.chatgpt.memory.mapper.SessionBoundaryPairMapper;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import com.chatgpt.memory.service.SessionBoundaryPipelineService;
+import com.chatgpt.memory.model.entity.SessionBoundaryPairDO;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/segmentation-visualizer")
 @RequiredArgsConstructor
-@Tag(name = "SegmentationVisualizerController", description = "BGE 向量切分全量动态可视化诊断控制器")
+@Tag(name = "SegmentationVisualizerController", description = "BGE 向量切分全量动态可视化诊断与多阶段人工复核控制器")
 public class SegmentationVisualizerController {
 
     private static final String REAL_DATA_PATH = "e:/data/chatGPT_back/chatGPT导出20251214/chat.html";
 
     private final ChatExportParser chatExportParser;
     private final VectorSessionSplitter vectorSessionSplitter;
+    private final SessionBoundaryPairMapper sessionBoundaryPairMapper;
+    private final SessionBoundaryPipelineService sessionBoundaryPipelineService;
 
     @Value("${chat.segmentation.l1-high-threshold:0.82}")
     private double highThreshold;
@@ -63,6 +71,82 @@ public class SegmentationVisualizerController {
 
     @Value("${chat.segmentation.short-text-min-length:30}")
     private int shortTextMinLength;
+
+    /**
+     * 一键全量预处理：将 chat.html 中所有对话的 Stage1 向量计算结果全部落库，
+     * 调用一次后总量固定，审核期间不再自动增长。
+     * <p>适合在正式批量审核前执行一次，确保全局总量稳定。</p>
+     */
+    @PostMapping("/preprocess-all")
+    @Operation(summary = "一键全量预处理全部对话", description = "解析 chat.html 并将所有尚未处理的对话执行 Stage1 向量计算后批量落库，保证审核期间总量不再自动增长")
+    public ResponseEntity<Map<String, Object>> preprocessAll() {
+        final File file = new File(REAL_DATA_PATH);
+        if (!file.exists() || !file.isFile()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "未找到数据源: " + REAL_DATA_PATH));
+        }
+        try {
+            sessionBoundaryPipelineService.initTable();
+            final List<com.chatgpt.memory.model.ChatConversation> conversations = chatExportParser.parseHtmlFile(file);
+            final int inserted = sessionBoundaryPipelineService.runStage1Incremental(conversations, Integer.MAX_VALUE);
+            final long total = sessionBoundaryPairMapper.count();
+            final long unchecked = sessionBoundaryPairMapper.countUnchecked(null, null);
+            return ResponseEntity.ok(Map.of(
+                    "code", 200,
+                    "message", "全量预处理完成",
+                    "newInserted", inserted,
+                    "totalCount", total,
+                    "uncheckedCount", unchecked
+            ));
+        } catch (Exception e) {
+            log.error("Failed to preprocess all conversations", e);
+            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "预处理失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 流式连续获取未审核 (l1_audit_status = UNCHECKED) 的 Pair 记录流
+     * 若数据库为空，自动初始化执行 Stage 1 将全量 Pair 导入表
+     */
+    @GetMapping("/stream")
+    @Operation(summary = "流式连续读取待审核 Pair 队列", description = "按 ID 顺序分批获取 l1_audit_status = 'UNCHECKED' 的 Pair 记录，支持增量计算落库与无感觉断点续看")
+    public ResponseEntity<Map<String, Object>> getUncheckedStream(
+            @Parameter(description = "过滤大区（可选 GREEN_MERGE / RED_SPLIT / FUZZY）", example = "FUZZY")
+            @RequestParam(required = false) final String l1Zone,
+            @Parameter(description = "是否仅过滤包含附件/图片的记录（可选 1）", example = "1")
+            @RequestParam(required = false) final Integer hasAttachment,
+            @Parameter(description = "获取流单页批次条数", example = "20")
+            @RequestParam(defaultValue = "20") final int limit) {
+
+        final File file = new File(REAL_DATA_PATH);
+        if (!file.exists() || !file.isFile()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "未找到数据源: " + REAL_DATA_PATH));
+        }
+
+        try {
+            // 首先确保数据表已创建（如果不存在则执行 DDL）
+            sessionBoundaryPipelineService.initTable();
+
+            // NOTE: 增量处理已迁移至 /api/v1/segmentation-visualizer/preprocess-all 接口，
+            // stream 端点不再自动触发，防止审核过程中总量悄悄膨胀导致用户困惑。
+
+            final List<SessionBoundaryPairDO> streamList = sessionBoundaryPairMapper.selectUncheckedStream(l1Zone, hasAttachment, limit);
+            final long total = sessionBoundaryPairMapper.count();
+            final long unchecked = sessionBoundaryPairMapper.countUnchecked(null, null);
+            final long audited = sessionBoundaryPairMapper.countAudited();
+
+            return ResponseEntity.ok(Map.of(
+                    "code", 200,
+                    "message", "获取未审核流成功",
+                    "totalCount", total,
+                    "uncheckedCount", unchecked,
+                    "auditedCount", audited,
+                    "data", streamList
+            ));
+        } catch (Exception e) {
+            log.error("Failed to fetch unchecked stream", e);
+            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "获取审核流失败: " + e.getMessage()));
+        }
+    }
 
     /**
      * 获取当前系统运行生效的切分配置门限
@@ -206,8 +290,6 @@ public class SegmentationVisualizerController {
             for (final ChatSession s : result.getSessions()) {
                 final Map<String, Object> sData = new HashMap<>();
                 sData.put("sessionId", s.getSessionId());
-                sData.put("messagesCount", s.getMessages() != null ? s.getMessages().size() : 0);
-                sData.put("startTime", s.getStartTime() != null ? s.getStartTime().toString() : "");
                 sData.put("endTime", s.getEndTime() != null ? s.getEndTime().toString() : "");
 
                 final List<Map<String, Object>> sessionMsgs = new ArrayList<>();
@@ -235,6 +317,80 @@ public class SegmentationVisualizerController {
                     "code", 500,
                     "message", "计算切分详情失败: " + e.getMessage()
             ));
+        }
+    }
+
+    /**
+     * 获取已完成核对的 Pair 历史列表（按时间倒序）
+     *
+     * @param limit 历史记录限制条数
+     * @return 历史 Pair ResponseEntity
+     */
+    @GetMapping("/audited-history")
+    @Operation(summary = "获取已完成核对的历史 Pair 列表", description = "用于人工回顾或二次反转修改已审核过的历史 Pair 记录")
+    public ResponseEntity<Map<String, Object>> getAuditedHistory(
+            @Parameter(description = "拉取条数", example = "50")
+            @RequestParam(defaultValue = "50") final int limit) {
+        try {
+            final List<SessionBoundaryPairDO> historyList = sessionBoundaryPairMapper.selectAuditedHistory(limit);
+            return ResponseEntity.ok(Map.of("code", 200, "message", "获取已审核历史成功", "data", historyList));
+        } catch (Exception e) {
+            log.error("Failed to fetch audited history", e);
+            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "获取已审核历史失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 通用多阶段 (L1 / L2) 人工复核点击落库 REST 接口
+     *
+     * @param pairId  Pair 数据库自增 ID（也可为 parentConversationId + pairIndex）
+     * @param stage   阶段编码 (L1 / L2)
+     * @param status  核对状态 (PASSED / OVERRIDDEN / UNCHECKED)
+     * @param verdict 判定结论 (MERGE / SPLIT)
+     * @param remark  人工说明（可选）
+     * @return 操作结果 ResponseEntity
+     */
+    @PostMapping("/audit")
+    @Operation(summary = "提交人工复核裁决（支持 L1 / L2 多阶段与撤销重置）", description = "前端点击【通过】、【强改】或【撤销重置】按钮后，实时更新 session_boundary_pair 数据库")
+    public ResponseEntity<Map<String, Object>> submitAudit(
+            @Parameter(description = "Pair 记录 ID", example = "101")
+            @RequestParam final Long pairId,
+            @Parameter(description = "阶段 (L1 或 L2)", example = "L1")
+            @RequestParam(defaultValue = "L1") final String stage,
+            @Parameter(description = "核对状态 (PASSED, OVERRIDDEN 或 UNCHECKED)", example = "OVERRIDDEN")
+            @RequestParam final String status,
+            @Parameter(description = "人工决定 (MERGE 或 SPLIT)", example = "MERGE")
+            @RequestParam final String verdict,
+            @Parameter(description = "人工说明（可选）", example = "经人工核实为同话题续问")
+            @RequestParam(required = false) final String remark) {
+
+        if (pairId == null || status == null || verdict == null) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "缺少必填参数 pairId, status, verdict"));
+        }
+
+        try {
+            int updated;
+            final String trimmedStatus = status.trim();
+            final String trimmedVerdict = verdict.trim();
+
+            if ("UNCHECKED".equalsIgnoreCase(trimmedStatus)) {
+                // 撤销重置：改回 PENDING 状态与 UNCHECKED 状态
+                updated = sessionBoundaryPairMapper.updateL1AuditResult(pairId, "UNCHECKED", null, null, "撤销重置重入队列");
+            } else if ("L2".equalsIgnoreCase(stage.trim())) {
+                updated = sessionBoundaryPairMapper.updateL2AuditResult(pairId, trimmedStatus, trimmedVerdict, trimmedVerdict, remark);
+            } else {
+                updated = sessionBoundaryPairMapper.updateL1AuditResult(pairId, trimmedStatus, trimmedVerdict, trimmedVerdict, remark);
+            }
+
+            if (updated > 0) {
+                log.info("[Audit] 成功落库人工复核 | pairId: {}, stage: {}, status: {}, verdict: {}", pairId, stage, trimmedStatus, trimmedVerdict);
+                return ResponseEntity.ok(Map.of("code", 200, "message", "人工复核提交并落库成功"));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("code", 404, "message", "未找到指定 pairId: " + pairId));
+            }
+        } catch (Exception e) {
+            log.error("Failed to persist audit for pairId: {}", pairId, e);
+            return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "复核写库失败: " + e.getMessage()));
         }
     }
 }

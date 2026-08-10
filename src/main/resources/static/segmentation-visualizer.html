@@ -3,341 +3,364 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChatGPT 记忆切分 BGE 向量动态可视化诊断仪</title>
+  <title>ChatGPT 记忆切分 BGE 向量全量单流连续极速复核工作台</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-card: #151c2c;
-      --border-color: #232f48;
-      --accent-blue: #3b82f6;
-      --text-main: #f3f4f6;
-      --text-sub: #9ca3af;
+      --bg-root:   #0d1117;
+      --bg-card:   #161b22;
+      --bg-box:    #0d1117;
+      --border:    rgba(48,54,61,0.8);
+      --blue:      #58a6ff;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --amber:     #d29922;
+      --purple:    #bc8cff;
+      --text-1:    #e6edf3;
+      --text-2:    #7d8590;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @keyframes slideIn {
+      from { opacity:0; transform:translateY(14px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; } 50% { opacity:.45; }
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(88,166,255,.3); border-radius:3px; }
     body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      padding: 24px;
-      line-height: 1.5;
+      background:var(--bg-root); color:var(--text-1);
+      font-family:'Inter',system-ui,sans-serif; padding:24px; line-height:1.6;
     }
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border-color);
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:20px; padding-bottom:16px;
+      border-bottom:1px solid var(--border);
     }
     .brand {
-      font-family: 'Outfit', sans-serif;
-      font-size: 22px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-family:'Outfit',sans-serif; font-size:22px; font-weight:700;
+      background:linear-gradient(135deg,#58a6ff 0%,#bc8cff 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     }
-    .controls {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      align-items: center;
-      background: var(--bg-card);
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
+    .stats-bar {
+      display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+      background:rgba(22,27,34,.7); backdrop-filter:blur(12px);
+      padding:14px 20px; border-radius:12px;
+      border:1px solid var(--border); margin-bottom:20px;
     }
-    .search-box {
-      flex: 1;
-      min-width: 260px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .stat-item { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text-2); }
+    .stat-num { font-family:'Outfit'; font-size:20px; font-weight:700; color:var(--blue); }
+    .btn-undo-top {
+      background:linear-gradient(135deg,#32383f,#424a53); color:#fff;
+      border:1px solid rgba(88,166,255,.25); padding:6px 14px;
+      border-radius:20px; cursor:pointer; font-size:13px; font-weight:600;
+      transition:all .2s;
     }
-    input, select {
-      background: #0f172a;
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-    }
-    input:focus, select:focus {
-      border-color: var(--accent-blue);
-    }
-    select { min-width: 320px; }
-    .tabs { display: flex; gap: 8px; }
+    .btn-undo-top:hover { border-color:var(--blue); box-shadow:0 0 8px rgba(88,166,255,.3); }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
     .tab-btn {
-      background: #0f172a;
-      border: 1px solid var(--border-color);
-      color: var(--text-sub);
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.2s;
+      background:var(--bg-box); border:1px solid var(--border);
+      color:var(--text-2); padding:7px 16px; border-radius:20px;
+      cursor:pointer; font-size:13px; font-weight:500; transition:all .2s;
     }
-    .tab-btn:hover { border-color: var(--accent-blue); color: var(--text-main); }
+    .tab-btn:hover { border-color:var(--blue); color:var(--text-1); }
     .tab-btn.active {
-      background: var(--accent-blue);
-      color: #fff;
-      border-color: var(--accent-blue);
+      background:linear-gradient(135deg,#1f6feb,#388bfd);
+      color:#fff; border-color:transparent;
+      box-shadow:0 2px 8px rgba(31,111,235,.4);
     }
     .pair-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      margin-bottom: 16px;
-      overflow: hidden;
+      background:var(--bg-card); border:1px solid var(--border);
+      border-radius:12px; margin-bottom:18px; overflow:hidden;
+      animation:slideIn .3s ease forwards;
+      transition:box-shadow .25s, border-color .25s;
     }
+    .pair-card:hover {
+      box-shadow:0 0 0 1px rgba(88,166,255,.3), 0 8px 24px rgba(0,0,0,.45);
+    }
+    .merge-card { border-left:3px solid var(--green); }
+    .split-card  { border-left:3px solid var(--red); }
     .pair-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 20px;
-      background: rgba(255,255,255,0.03);
-      border-bottom: 1px solid var(--border-color);
+      display:flex; justify-content:space-between; align-items:center;
+      padding:11px 20px; background:rgba(255,255,255,.02);
+      border-bottom:1px solid var(--border);
     }
-    .badge {
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
+    .badge { padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; }
+    .badge.merge {
+      background:rgba(63,185,80,.12); color:var(--green);
+      border:1px solid rgba(63,185,80,.35);
     }
-    .badge.strong { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
-    .badge.ambiguous { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
-    .badge.split { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid #f43f5e; }
+    .badge.split {
+      background:rgba(248,81,73,.12); color:var(--red);
+      border:1px solid rgba(248,81,73,.35);
+    }
     .pair-body {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 16px;
-      padding: 20px;
-      align-items: center;
+      display:grid; grid-template-columns:1fr auto 1fr;
+      gap:16px; padding:18px 20px; align-items:start;
     }
     .msg-box {
-      background: #0f172a;
-      padding: 14px;
-      border-radius: 8px;
-      border: 1px solid #334155;
-      font-size: 13px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 220px;
-      overflow-y: auto;
+      background:var(--bg-box); padding:14px; border-radius:8px;
+      border:1px solid var(--border); font-size:13px;
+      white-space:pre-wrap; word-break:break-word;
+      max-height:320px; overflow-y:auto; color:#c9d1d9;
+    }
+    .msg-box img {
+      max-width:100%; max-height:220px; border-radius:6px;
+      margin:8px 0; border:1px solid var(--border);
+      display:block; cursor:zoom-in;
+      box-shadow:0 2px 8px rgba(0,0,0,.4);
     }
     .msg-box .role {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent-blue);
-      text-transform: uppercase;
-      margin-bottom: 6px;
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      margin-bottom:8px; padding-bottom:6px;
+      border-bottom:1px solid var(--border);
     }
+    .msg-box .role.user      { color:var(--blue);   border-left:3px solid var(--blue);   padding-left:8px; }
+    .msg-box .role.assistant { color:var(--purple); border-left:3px solid var(--purple); padding-left:8px; }
     .score-gauge {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 120px;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; min-width:130px; gap:4px;
     }
-    .score-num { font-size: 22px; font-weight: 700; font-family: 'Outfit'; }
-    .session-blocks { margin-top: 32px; }
-    .session-block {
-      border: 2px dashed var(--accent-blue);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 24px;
-      background: rgba(59, 130, 246, 0.05);
+    .score-num { font-size:28px; font-weight:700; font-family:'Outfit'; }
+    .audit-bar {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 20px; background:rgba(13,17,23,.6);
+      backdrop-filter:blur(4px); border-top:1px solid var(--border);
     }
-    .session-title { font-size: 16px; font-weight: 700; color: #60a5fa; margin-bottom: 12px; }
+    .btn-group { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn-audit {
+      padding:8px 18px; border-radius:8px; font-size:13px; font-weight:700;
+      cursor:pointer; border:none; transition:all .18s;
+    }
+    .btn-audit:active { transform:scale(.97); }
+    .btn-pass    { background:linear-gradient(135deg,#1a7f37,#2ea043); color:#fff; }
+    .btn-pass:hover    { box-shadow:0 0 12px rgba(46,160,67,.5); }
+    .btn-to-split { background:linear-gradient(135deg,#a40e26,#cf222e); color:#fff; }
+    .btn-to-split:hover { box-shadow:0 0 12px rgba(207,34,46,.5); }
+    .btn-to-merge { background:linear-gradient(135deg,#9a6700,#bf8700); color:#fff; }
+    .btn-to-merge:hover { box-shadow:0 0 12px rgba(191,135,0,.5); }
+    .btn-reset   { background:linear-gradient(135deg,#32383f,#424a53); color:#fff; }
+    .btn-reset:hover   { box-shadow:0 0 10px rgba(88,166,255,.25); }
     .loading {
-      text-align: center;
-      padding: 40px;
-      color: var(--accent-blue);
-      font-size: 16px;
+      text-align:center; padding:50px; color:var(--blue); font-size:15px;
+      animation:pulse 1.6s ease-in-out infinite;
     }
+    .completed-banner {
+      text-align:center; padding:60px 20px;
+      background:var(--bg-card); border-radius:16px; margin-top:30px;
+      border:1px solid rgba(63,185,80,.4);
+      box-shadow:0 0 30px rgba(63,185,80,.08) inset;
+    }
+    .tag-status { font-size:12px; font-weight:600; padding:3px 10px; border-radius:4px; }
+    .tag-passed    { background:rgba(63,185,80,.15);  color:var(--green); }
+    .tag-overridden{ background:rgba(210,153,34,.12); color:var(--amber); border:1px solid rgba(210,153,34,.35); }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="brand">⚡ ChatGPT 记忆切分 BGE 向量动态可视化诊断仪</div>
-    <div style="color: var(--text-sub); font-size: 13px;" id="configText">门限加载中...</div>
+    <div class="brand">⚡ ChatGPT 记忆切分 BGE 向量全量单流连续极速复核工作台</div>
+    <div style="color:var(--text-2);font-size:13px;">自动断点续核（刷新后自动加载最新进度，已核对不再重复出现）</div>
   </div>
 
-  <div class="controls">
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="实时搜索全量 1,142 场对话 (输入 Kafka, Redis 等)..." oninput="onSearchInput()">
-      <select id="convSelect" onchange="onConvSelect()"></select>
-    </div>
+  <div class="stats-bar">
+    <div class="stat-item">全量 Pair: <span class="stat-num" id="totalCount">0</span></div>
+    <div class="stat-item">已完成核对: <span class="stat-num" style="color:#3fb950;" id="auditedCount">0</span></div>
+    <div class="stat-item">剩余待审核: <span class="stat-num" style="color:#d29922;" id="uncheckedCount">0</span></div>
+    <button class="btn-undo-top" id="undoBtn" onclick="undoLastAudit()" style="display:none;">↺ 撤销上一条误操作</button>
     <div class="tabs">
-      <button class="tab-btn active" onclick="filterPairs('all', this)">全部 Pair</button>
-      <button class="tab-btn" onclick="filterPairs('strong', this)">🟢 强相关</button>
-      <button class="tab-btn" onclick="filterPairs('ambiguous', this)">🟡 模糊延伸区</button>
-      <button class="tab-btn" onclick="filterPairs('split', this)">🔴 跨主题切断</button>
+      <button class="tab-btn active" onclick="switchView('stream','',this)">全部待审核队列</button>
+      <button class="tab-btn" onclick="switchView('stream','GREEN_MERGE',this)">🟢 强合并 (&gt;=0.82)</button>
+      <button class="tab-btn" onclick="switchView('stream','FUZZY',this)">🟡 模糊区 (0.60-0.82)</button>
+      <button class="tab-btn" onclick="switchView('stream','RED_SPLIT',this)">🔴 切断区 (&lt;0.60)</button>
+      <button class="tab-btn" onclick="switchView('stream','',this,1)">📎 只看含图片/附件</button>
+      <button class="tab-btn" onclick="switchView('history','',this)">📜 已核对历史记录</button>
     </div>
   </div>
 
   <div id="contentContainer">
-    <div class="loading">正在连接后端初始化全量对话索引...</div>
+    <div class="loading">正在加载未审核 Pair 流...</div>
   </div>
+<script>
+    let currentMode = 'stream';
+    let currentZoneFilter = '';
+    let currentAttachmentFilter = null;
+    let itemList = [];
+    let lastAuditedStack = [];
 
-  <script>
-    let activeConfig = null;
-    let conversations = [];
-    let currentConvDetail = null;
-    let currentFilter = 'all';
-    let searchTimeout = null;
+    async function loadData() {
+      if (currentMode === 'history') { await loadHistory(); } else { await loadStream(); }
+    }
 
-    async function init() {
+    async function loadStream() {
+      document.getElementById('contentContainer').innerHTML = '<div class="loading">正在拉取待审核 Pair 批次...</div>';
       try {
-        // 1. 获取后端实时生效的配置门限
-        const cfgRes = await fetch('/api/v1/segmentation-visualizer/config');
-        const cfgData = await cfgRes.json();
-        if (cfgData.code === 200) {
-          activeConfig = cfgData.data;
-          document.getElementById('configText').innerText =
-            `门限规则：强相关 >= ${activeConfig.highThreshold} | 模糊区 ${activeConfig.lowThreshold} - ${activeConfig.highThreshold} | 跨主题 < ${activeConfig.lowThreshold} (短文本判定: ${activeConfig.shortTextMinLength}字)`;
-        }
-
-        // 2. 加载全量对话索引
-        await loadConversations('');
-      } catch (err) {
-        document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">后端连接失败: ${err.message}</div>`;
-      }
-    }
-
-    async function loadConversations(keyword) {
-      const url = keyword ? `/api/v1/segmentation-visualizer/conversations?keyword=${encodeURIComponent(keyword)}` : '/api/v1/segmentation-visualizer/conversations';
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.code === 200) {
-        conversations = json.data || [];
-        renderSelectOptions();
-        if (conversations.length > 0) {
-          await loadConvDetail(conversations[0].id);
-        } else {
-          document.getElementById('contentContainer').innerHTML = `<div class="loading">未找到包含关键字 "${escapeHtml(keyword)}" 的对话</div>`;
-        }
-      }
-    }
-
-    function renderSelectOptions() {
-      const select = document.getElementById('convSelect');
-      select.innerHTML = '';
-      conversations.forEach((c, i) => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.innerText = `${i + 1}. ${c.title} (${c.messagesCount} 条消息)`;
-        select.appendChild(opt);
-      });
-    }
-
-    function onSearchInput() {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        const kw = document.getElementById('searchInput').value.trim();
-        loadConversations(kw);
-      }, 300);
-    }
-
-    async function onConvSelect() {
-      const convId = document.getElementById('convSelect').value;
-      if (convId) {
-        await loadConvDetail(convId);
-      }
-    }
-
-    async function loadConvDetail(convId) {
-      document.getElementById('contentContainer').innerHTML = `<div class="loading">正在按当前门限实算向量切分得分 (BGE 512维)...</div>`;
-      try {
-        const res = await fetch(`/api/v1/segmentation-visualizer/conversations/${convId}`);
+        let url = '/api/v1/segmentation-visualizer/stream?limit=25';
+        if (currentZoneFilter) url += '&l1Zone=' + currentZoneFilter;
+        if (currentAttachmentFilter !== null) url += '&hasAttachment=' + currentAttachmentFilter;
+        const res = await fetch(url);
         const json = await res.json();
         if (json.code === 200) {
-          currentConvDetail = json.data;
-          renderDetail();
+          updateStats(json.totalCount, json.auditedCount, json.uncheckedCount);
+          itemList = json.data || [];
+          renderStream();
         } else {
-          document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">${json.message}</div>`;
+          document.getElementById('contentContainer').innerHTML = '<div class="loading" style="color:#f85149">' + json.message + '</div>';
         }
       } catch (err) {
-        document.getElementById('contentContainer').innerHTML = `<div class="loading" style="color:#f43f5e">加载详情失败: ${err.message}</div>`;
+        document.getElementById('contentContainer').innerHTML = '<div class="loading" style="color:#f85149">连线失败: ' + err.message + '</div>';
       }
     }
 
-    function renderDetail() {
-      if (!currentConvDetail) return;
-
-      let pairsHtml = '';
-      currentConvDetail.pairs.forEach(p => {
-        if (currentFilter !== 'all' && p.type !== currentFilter) {
-          return;
-        }
-
-        let scoreColor = '#34d399';
-        if (p.type === 'ambiguous') scoreColor = '#fbbf24';
-        if (p.type === 'split') scoreColor = '#fb7185';
-
-        pairsHtml += `
-          <div class="pair-card">
-            <div class="pair-header">
-              <span style="font-weight:600; font-size:14px;">Pair #${p.index} (${escapeHtml(p.roleA)} → ${escapeHtml(p.roleB)})</span>
-              <span class="badge ${p.type}">${escapeHtml(p.label)}</span>
-            </div>
-            <div class="pair-body">
-              <div class="msg-box"><div class="role">[MESSAGE A - ${escapeHtml(p.roleA.toUpperCase())}]</div>${escapeHtml(p.textA)}</div>
-              <div class="score-gauge">
-                <div class="score-num" style="color: ${scoreColor}">${p.score}</div>
-                <div style="font-size:11px; color:var(--text-sub);">BGE 余弦得分</div>
-              </div>
-              <div class="msg-box"><div class="role">[MESSAGE B - ${escapeHtml(p.roleB.toUpperCase())}]</div>${escapeHtml(p.textB)}</div>
-            </div>
-          </div>
-        `;
-      });
-
-      let sessionsHtml = '';
-      currentConvDetail.sessions.forEach((s, idx) => {
-        let msgsHtml = '';
-        s.messages.forEach(m => {
-          msgsHtml += `<div class="msg-box" style="margin-bottom:8px;"><div class="role">[${escapeHtml(m.role)}]</div>${escapeHtml(m.content)}</div>`;
-        });
-        sessionsHtml += `
-          <div class="session-block">
-            <div class="session-title">Session #${idx + 1}: ${escapeHtml(s.sessionId)} (${s.messagesCount} 条消息)</div>
-            ${msgsHtml}
-          </div>
-        `;
-      });
-
-      document.getElementById('contentContainer').innerHTML = `
-        <div style="margin-bottom: 16px; font-size:14px; color:var(--text-sub);">
-          对话标题：<strong style="color:var(--text-main);">${escapeHtml(currentConvDetail.title)}</strong> | 原始消息数：${currentConvDetail.messagesCount} 条 | 切分生成 Session 块数：${currentConvDetail.sessionsCount} 个
-        </div>
-        ${pairsHtml || '<div class="loading">当前筛选条件下暂无 Pair 数据</div>'}
-        <div class="session-blocks">
-          <h2 style="margin-bottom:16px;">📦 拆分产物：该对话最终生成的 ${currentConvDetail.sessionsCount} 个独立 Session 单元</h2>
-          ${sessionsHtml}
-        </div>
-      `;
+    async function loadHistory() {
+      document.getElementById('contentContainer').innerHTML = '<div class="loading">正在拉取最新已核对的历史记录...</div>';
+      try {
+        const res = await fetch('/api/v1/segmentation-visualizer/audited-history?limit=50');
+        const json = await res.json();
+        if (json.code === 200) { itemList = json.data || []; renderHistory(); }
+        else { document.getElementById('contentContainer').innerHTML = '<div class="loading" style="color:#f85149">' + json.message + '</div>'; }
+      } catch (err) {
+        document.getElementById('contentContainer').innerHTML = '<div class="loading" style="color:#f85149">获取历史失败: ' + err.message + '</div>';
+      }
     }
 
-    function filterPairs(type, btn) {
-      currentFilter = type;
+    function updateStats(total, audited, unchecked) {
+      document.getElementById('totalCount').innerText = total || 0;
+      document.getElementById('auditedCount').innerText = audited || 0;
+      document.getElementById('uncheckedCount').innerText = unchecked || 0;
+      document.getElementById('undoBtn').style.display = lastAuditedStack.length > 0 ? 'inline-block' : 'none';
+    }
+
+    function renderStream() {
+      if (!itemList || itemList.length === 0) {
+        document.getElementById('contentContainer').innerHTML = '<div class="completed-banner"><h2 style="color:#3fb950;font-size:24px;margin-bottom:12px;">🎉 恭喜！当前队列中的 Pair 已全部核对完成！</h2><p style="color:var(--text-2);">已全量实时落库保存至 MySQL 数据库。</p></div>';
+        return;
+      }
+      let html = '';
+      itemList.forEach(p => {
+        const isL1Merge = p.l1Score >= 0.60;
+        const scoreColor = isL1Merge ? '#3fb950' : '#f85149';
+        const badgeHtml = isL1Merge
+          ? '<span class="badge merge">🟢 L1向量判定：应该合并 (MERGE)</span>'
+          : '<span class="badge split">🔴 L1向量判定：应该切断 (SPLIT)</span>';
+        const actionBtnHtml = isL1Merge
+          ? '<button class="btn-audit btn-pass" onclick="submitSingleAudit(' + p.id + ',\'PASSED\',\'MERGE\',this)">✅ 确认正确 (Pass 并下一条)</button><button class="btn-audit btn-to-split" onclick="submitSingleAudit(' + p.id + ',\'OVERRIDDEN\',\'SPLIT\',this)">✂️ 强改切断 (SPLIT)</button>'
+          : '<button class="btn-audit btn-pass" onclick="submitSingleAudit(' + p.id + ',\'PASSED\',\'SPLIT\',this)">✅ 确认正确 (Pass 并下一条)</button><button class="btn-audit btn-to-merge" onclick="submitSingleAudit(' + p.id + ',\'OVERRIDDEN\',\'MERGE\',this)">✏️ 强改合并 (MERGE)</button>';
+        html += buildPairCardHtml(p, badgeHtml, scoreColor, actionBtnHtml, isL1Merge);
+      });
+      document.getElementById('contentContainer').innerHTML = html;
+    }
+
+    function renderHistory() {
+      if (!itemList || itemList.length === 0) {
+        document.getElementById('contentContainer').innerHTML = '<div class="loading">暂无已完成核对的历史记录</div>';
+        return;
+      }
+      let html = '';
+      itemList.forEach(p => {
+        const isL1Merge = p.l1Score >= 0.60;
+        const scoreColor = isL1Merge ? '#3fb950' : '#f85149';
+        const auditTagHtml = p.l1AuditStatus === 'PASSED'
+          ? '<span class="tag-status tag-passed">✅ 人工确认认可算法 (' + p.finalDecision + ')</span>'
+          : '<span class="tag-status tag-overridden">✏️ 人工纠偏修正为 (' + p.finalDecision + ')</span>';
+        const actionBtnHtml = '<button class="btn-audit btn-to-split" onclick="submitSingleAudit(' + p.id + ',\'OVERRIDDEN\',\'SPLIT\',this)">✂️ 强改切断</button><button class="btn-audit btn-to-merge" onclick="submitSingleAudit(' + p.id + ',\'OVERRIDDEN\',\'MERGE\',this)">✏️ 强改合并</button><button class="btn-audit btn-reset" onclick="submitSingleAudit(' + p.id + ',\'UNCHECKED\',\'MERGE\',this)">↺ 撤销重置</button>';
+        html += buildPairCardHtml(p, auditTagHtml, scoreColor, actionBtnHtml, isL1Merge);
+      });
+      document.getElementById('contentContainer').innerHTML = html;
+    }
+
+    function buildPairCardHtml(p, statusHtml, scoreColor, actionBtnHtml, isL1Merge) {
+      const cardClass = isL1Merge ? 'pair-card merge-card' : 'pair-card split-card';
+      const roleAClass = (p.messageARole||'').toLowerCase() === 'user' ? 'role user' : 'role assistant';
+      const roleBClass = (p.messageBRole||'').toLowerCase() === 'user' ? 'role user' : 'role assistant';
+      return '<div class="' + cardClass + '" id="card-id-' + p.id + '">'
+        + '<div class="pair-header">'
+        + '<span style="font-weight:600;font-size:14px;color:var(--blue);">对话 ID: ' + escapeHtml(p.parentConversationId) + ' | Pair #' + p.pairIndex + ' (' + escapeHtml(p.messageARole) + ' → ' + escapeHtml(p.messageBRole) + ')</span>'
+        + '<div>' + statusHtml + '</div></div>'
+        + '<div class="pair-body">'
+        + '<div class="msg-box"><div class="' + roleAClass + '">[MESSAGE A - ' + escapeHtml(p.messageARole.toUpperCase()) + ']</div>' + formatMessageContent(p.messageAText) + '</div>'
+        + '<div class="score-gauge"><div class="score-num" style="color:' + scoreColor + '">' + p.l1Score + '</div><div style="font-size:11px;color:var(--text-2);">BGE 余弦得分</div></div>'
+        + '<div class="msg-box"><div class="' + roleBClass + '">[MESSAGE B - ' + escapeHtml(p.messageBRole.toUpperCase()) + ']</div>' + formatMessageContent(p.messageBText) + '</div>'
+        + '</div>'
+        + '<div class="audit-bar">'
+        + '<div style="font-size:13px;color:var(--text-2);">' + (isL1Merge ? 'L1判合并。若判定合理直接点"确认正确"；若误合并请点"强改切断"：' : 'L1判切断。若判定合理直接点"确认正确"；若误切断请点"强改合并"：') + '</div>'
+        + '<div class="btn-group">' + actionBtnHtml + '</div></div></div>';
+    }
+
+    async function submitSingleAudit(pairId, status, verdict, btnElement) {
+      const cardEl = document.getElementById('card-id-' + pairId);
+      if (cardEl) { cardEl.style.opacity = '0.5'; cardEl.style.pointerEvents = 'none'; }
+      try {
+        const bodyData = new URLSearchParams();
+        bodyData.append('pairId', pairId);
+        bodyData.append('stage', 'L1');
+        bodyData.append('status', status);
+        bodyData.append('verdict', verdict);
+        const res = await fetch('/api/v1/segmentation-visualizer/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: bodyData
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+          if (status !== 'UNCHECKED') lastAuditedStack.push(pairId);
+          if (cardEl && currentMode === 'stream') cardEl.remove();
+          const auditedEl = document.getElementById('auditedCount');
+          const uncheckedEl = document.getElementById('uncheckedCount');
+          if (status === 'UNCHECKED') {
+            auditedEl.innerText = Math.max(0, parseInt(auditedEl.innerText||0) - 1);
+            uncheckedEl.innerText = parseInt(uncheckedEl.innerText||0) + 1;
+          } else {
+            auditedEl.innerText = parseInt(auditedEl.innerText||0) + 1;
+            uncheckedEl.innerText = Math.max(0, parseInt(uncheckedEl.innerText||0) - 1);
+          }
+          document.getElementById('undoBtn').style.display = lastAuditedStack.length > 0 ? 'inline-block' : 'none';
+          itemList = itemList.filter(item => item.id !== pairId);
+          if (currentMode === 'stream' && itemList.length === 0) { await loadStream(); }
+          else if (currentMode === 'history') { await loadHistory(); }
+        } else {
+          alert('落库失败: ' + json.message);
+          if (cardEl) { cardEl.style.opacity = '1'; cardEl.style.pointerEvents = 'auto'; }
+        }
+      } catch (e) {
+        alert('请求异常: ' + e.message);
+        if (cardEl) { cardEl.style.opacity = '1'; cardEl.style.pointerEvents = 'auto'; }
+      }
+    }
+
+    async function undoLastAudit() {
+      if (lastAuditedStack.length === 0) return;
+      const lastId = lastAuditedStack.pop();
+      await submitSingleAudit(lastId, 'UNCHECKED', 'MERGE', null);
+      await loadData();
+    }
+
+    function switchView(mode, zone, btn, hasAttachment = null) {
+      currentMode = mode; currentZoneFilter = zone; currentAttachmentFilter = hasAttachment;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderDetail();
+      loadData();
+    }
+
+    function formatMessageContent(str) {
+      if (!str) return '';
+      let s = str.replace(/!\[图片\]\(([^)]+)\)/g, function(match, rawUrl) {
+        let cleanUrl = rawUrl.trim();
+        if (cleanUrl.includes('://')) cleanUrl = cleanUrl.substring(cleanUrl.lastIndexOf('://') + 3);
+        if (!cleanUrl.startsWith('/chat-assets/')) cleanUrl = '/chat-assets/' + cleanUrl.replace(/^\/+/, '');
+        return '<div style="margin:8px 0;"><img src="' + cleanUrl + '" alt="聊天上下文图片" onclick="window.open(\'' + cleanUrl + '\',\'_blank\')" title="点击查看高清原图" style="max-width:100%;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);" /></div>';
+      });
+      return s.replace(/\n/g, '<br/>');
     }
 
     function escapeHtml(str) {
-      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    window.onload = init;
-  </script>
+    window.onload = loadData;
+</script>
 </body>
 </html>
