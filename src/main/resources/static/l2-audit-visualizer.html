@@ -566,6 +566,82 @@
             text-align: center;
         }
 
+        /* 护眼全屏居中弹窗 Custom Center Dialog Overlay */
+        .custom-dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(28, 25, 23, 0.45);
+            backdrop-filter: blur(5px);
+            z-index: 100000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .custom-dialog-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .custom-dialog-box {
+            background: #fffdf8;
+            border: 1px solid #fde68a;
+            border-radius: var(--radius-lg);
+            width: 440px;
+            max-width: 90vw;
+            padding: 24px 28px;
+            box-shadow: 0 20px 50px rgba(180, 83, 9, 0.2);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .custom-dialog-overlay.active .custom-dialog-box {
+            transform: scale(1);
+        }
+
+        .custom-dialog-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .custom-dialog-header i {
+            font-size: 22px;
+            color: var(--primary);
+            background: var(--primary-light);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .custom-dialog-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .custom-dialog-message {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .custom-dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
         /* 卡片底部操作栏 Card Footer */
         .card-footer {
             display: flex;
@@ -809,6 +885,21 @@
             <div class="image-modal-close" onclick="closeImageModal()">&times;</div>
             <img id="imageModalImg" class="image-modal-img" src="" alt="大图预览">
             <div id="imageModalCaption" class="image-modal-caption"></div>
+        </div>
+    </div>
+
+    <!-- 护眼全屏居中 Custom Confirm/Alert Modal 弹窗 -->
+    <div id="customDialogOverlay" class="custom-dialog-overlay">
+        <div class="custom-dialog-box">
+            <div class="custom-dialog-header">
+                <i id="dialogIcon" class="fa-solid fa-circle-question"></i>
+                <div id="dialogTitle" class="custom-dialog-title">操作确认</div>
+            </div>
+            <div id="dialogMessage" class="custom-dialog-message">确定要执行此操作吗？</div>
+            <div class="custom-dialog-actions">
+                <button id="dialogBtnCancel" class="btn btn-secondary btn-sm" style="display: none;">取消</button>
+                <button id="dialogBtnConfirm" class="btn btn-warning btn-sm">确认</button>
+            </div>
         </div>
     </div>
 
@@ -1089,6 +1180,94 @@
             formData.append('verdict', verdict);
             formData.append('remark', '人工复核面板在线修正');
 
+        // 自定义优雅居中确认框（返回 Promise<boolean>）
+        function showCustomConfirm(title, message, confirmText = '确认启动') {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('customDialogOverlay');
+                const titleEl = document.getElementById('dialogTitle');
+                const msgEl = document.getElementById('dialogMessage');
+                const iconEl = document.getElementById('dialogIcon');
+                const btnCancel = document.getElementById('dialogBtnCancel');
+                const btnConfirm = document.getElementById('dialogBtnConfirm');
+
+                titleEl.innerText = title || '操作确认';
+                msgEl.innerText = message || '是否继续执行？';
+                iconEl.className = 'fa-solid fa-circle-question';
+                iconEl.style.color = 'var(--primary)';
+
+                btnCancel.style.display = 'inline-flex';
+                btnCancel.innerText = '取消';
+
+                btnConfirm.innerText = confirmText;
+                btnConfirm.className = 'btn btn-warning btn-sm';
+
+                overlay.classList.add('active');
+
+                const cleanup = () => {
+                    overlay.classList.remove('active');
+                    btnConfirm.removeEventListener('click', onConfirm);
+                    btnCancel.removeEventListener('click', onCancel);
+                };
+
+                const onConfirm = () => { cleanup(); resolve(true); };
+                const onCancel = () => { cleanup(); resolve(false); };
+
+                btnConfirm.addEventListener('click', onConfirm);
+                btnCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        // 自定义优雅居中提示框
+        function showCustomAlert(title, message, type = 'info') {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('customDialogOverlay');
+                const titleEl = document.getElementById('dialogTitle');
+                const msgEl = document.getElementById('dialogMessage');
+                const iconEl = document.getElementById('dialogIcon');
+                const btnCancel = document.getElementById('dialogBtnCancel');
+                const btnConfirm = document.getElementById('dialogBtnConfirm');
+
+                titleEl.innerText = title || '系统提示';
+                msgEl.innerText = message || '';
+                btnCancel.style.display = 'none';
+
+                if (type === 'error') {
+                    iconEl.className = 'fa-solid fa-circle-xmark';
+                    iconEl.style.color = '#dc2626';
+                    btnConfirm.className = 'btn btn-secondary btn-sm';
+                } else if (type === 'success') {
+                    iconEl.className = 'fa-solid fa-circle-check';
+                    iconEl.style.color = '#059669';
+                    btnConfirm.className = 'btn btn-primary btn-sm';
+                } else {
+                    iconEl.className = 'fa-solid fa-circle-info';
+                    iconEl.style.color = 'var(--primary)';
+                    btnConfirm.className = 'btn btn-secondary btn-sm';
+                }
+
+                btnConfirm.innerText = '好的';
+
+                overlay.classList.add('active');
+
+                const onConfirm = () => {
+                    overlay.classList.remove('active');
+                    btnConfirm.removeEventListener('click', onConfirm);
+                    resolve();
+                };
+
+                btnConfirm.addEventListener('click', onConfirm);
+            });
+        }
+
+        // 4. 人工点击审核提交
+        async function submitAudit(pairId, status, verdict) {
+            const formData = new FormData();
+            formData.append('pairId', pairId);
+            formData.append('stage', 'L2');
+            formData.append('status', status);
+            formData.append('verdict', verdict);
+            formData.append('remark', '人工复核面板在线修正');
+
             try {
                 const res = await fetch('/api/v1/segmentation-visualizer/audit', {
                     method: 'POST',
@@ -1099,10 +1278,10 @@
                     loadStats();
                     loadRecords();
                 } else {
-                    alert('提交失败: ' + data.message);
+                    showCustomAlert('提交失败', data.message || '操作未成功处理', 'error');
                 }
             } catch (err) {
-                alert('提交失败，服务网络异常');
+                showCustomAlert('提交失败', '网络或服务端响应异常', 'error');
             }
         }
 
@@ -1112,8 +1291,10 @@
             const countVal = document.getElementById(countInputId).value || '100';
             const maxCount = parseInt(countVal, 10);
 
-            const modeText = forceOverwrite ? `【强制覆盖重跑前 ${maxCount} 条】` : `【增量接着推导剩余 ${maxCount > 0 ? maxCount : '全量'} 条未审记录】`;
-            if (!confirm(`确认要启动 L2 大模型推导 ${modeText} 吗？`)) {
+            const modeText = forceOverwrite ? `【强行覆盖推导前 ${maxCount} 条】` : `【增量接着推导剩余 ${maxCount > 0 ? maxCount : '全量'} 条未审记录】`;
+            
+            const confirmed = await showCustomConfirm('启动任务确认', `确认要启动 L2 大模型推导 ${modeText} 吗？`, '确认启动');
+            if (!confirmed) {
                 return;
             }
 
@@ -1127,14 +1308,14 @@
                     body: formData
                 });
                 const data = await res.json();
-                alert(data.message || 'Stage 2 推导任务已在后台异步启动！');
+                showCustomAlert('任务启动成功', data.message || 'Stage 2 推导任务已在后台异步启动！', 'success');
                 
                 setTimeout(() => {
                     loadStats();
                     loadRecords();
                 }, 1500);
             } catch (err) {
-                alert('请求异常，无法启动 Stage 2 任务');
+                showCustomAlert('启动失败', '网络或服务端响应异常，无法启动 Stage 2 任务', 'error');
             }
         }
     </script>
