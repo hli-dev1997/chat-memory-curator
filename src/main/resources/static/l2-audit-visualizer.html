@@ -1183,14 +1183,7 @@
             loadRecords();
         }
 
-        // 4. 人工点击审核提交
-        async function submitAudit(pairId, status, verdict) {
-            const formData = new FormData();
-            formData.append('pairId', pairId);
-            formData.append('stage', 'L2');
-            formData.append('status', status);
-            formData.append('verdict', verdict);
-            formData.append('remark', '人工复核面板在线修正');
+
 
         // 自定义优雅居中确认框（返回 Promise<boolean>）
         function showCustomConfirm(title, message, confirmText = '确认启动') {
