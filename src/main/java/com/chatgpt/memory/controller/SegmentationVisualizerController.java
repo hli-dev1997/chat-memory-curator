@@ -133,6 +133,13 @@ public class SegmentationVisualizerController {
             @Parameter(description = "定量处理最大条数上限（0表示全量，例如指定100条）", example = "100")
             @RequestParam(defaultValue = "0") final int maxCount) {
 
+        if (l2TaskStatus.get() != null && Boolean.TRUE.equals(l2TaskStatus.get().getRunning())) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "code", 409,
+                    "message", "已有 L2 大模型推导任务在后台正在运行中，请勿重复触发！"
+            ));
+        }
+
         final com.chatgpt.memory.common.enums.LlmModelEnum textEnum = parseModelEnum(textModel);
         final com.chatgpt.memory.common.enums.LlmModelEnum omniEnum = parseModelEnum(multimodalModel);
 

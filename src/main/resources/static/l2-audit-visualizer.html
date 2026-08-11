@@ -1360,10 +1360,13 @@
                     body: formData
                 });
                 const data = await res.json();
-                showCustomAlert('任务启动成功', data.message || 'Stage 2 推导任务已在后台异步启动！', 'success');
-                
-                if (taskPollTimer) clearInterval(taskPollTimer);
-                taskPollTimer = setInterval(pollL2TaskStatus, 2000);
+                if (data.code === 200) {
+                    showCustomAlert('任务启动成功', data.message || 'Stage 2 推导任务已在后台异步启动！', 'success');
+                    if (taskPollTimer) clearInterval(taskPollTimer);
+                    taskPollTimer = setInterval(pollL2TaskStatus, 2000);
+                } else {
+                    showCustomAlert('启动失败', data.message || '无法启动 Stage 2 任务', 'error');
+                }
             } catch (err) {
                 showCustomAlert('启动失败', '网络或服务端响应异常，无法启动 Stage 2 任务', 'error');
             }

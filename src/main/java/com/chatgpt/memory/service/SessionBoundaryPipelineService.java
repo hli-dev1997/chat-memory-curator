@@ -521,10 +521,14 @@ public class SessionBoundaryPipelineService {
             processStatus = ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode();
         }
 
+        final String actualModelName = isImageFallback
+                ? (customTextModel != null ? customTextModel.getModelName() : LlmModelEnum.QWEN_37_FLASH.getModelName())
+                : modelEnum.getModelName();
+
         sessionBoundaryPairMapper.updateL2Result(
-                pairDO.getId(), l2Verdict, l2Confidence, l2Reason, modelEnum.getModelName(), finalDecision, processStatus);
+                pairDO.getId(), l2Verdict, l2Confidence, l2Reason, actualModelName, finalDecision, processStatus);
         log.info("[Stage2] Pair {} L2 裁决完成 -> 结果: {}, 置信度: {}, 模型: {}, 状态: {}",
-                pairDO.getId(), l2Verdict, l2Confidence, modelEnum.getModelName(), processStatus);
+                pairDO.getId(), l2Verdict, l2Confidence, actualModelName, processStatus);
     }
 
     /**
