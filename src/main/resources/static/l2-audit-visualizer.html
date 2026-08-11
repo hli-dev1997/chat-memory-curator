@@ -1310,7 +1310,6 @@
                 if (json.code === 200 && json.status) {
                     const st = json.status;
                     loadStats();
-                    loadRecords();
 
                     if (st.running) {
                         if (!taskPollTimer) {
@@ -1320,6 +1319,7 @@
                         if (taskPollTimer) {
                             clearInterval(taskPollTimer);
                             taskPollTimer = null;
+                            loadRecords(); // 任务跑完时一次性刷新列表
                         }
                         if (st.lastError && st.lastError !== lastAlertedError) {
                             lastAlertedError = st.lastError;

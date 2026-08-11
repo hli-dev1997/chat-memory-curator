@@ -26,6 +26,7 @@ public class ChatAssetController {
 
     private static final String EXPORT_DIR_PATH = "e:/data/chatGPT_back/chatGPT导出20251214";
     private final File exportDir = new File(EXPORT_DIR_PATH);
+    private final java.util.Map<String, File> assetCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     @GetMapping("/chat-assets/**")
     public ResponseEntity<Resource> serveAsset(HttpServletRequest request) {
@@ -44,13 +45,20 @@ public class ChatAssetController {
             return ResponseEntity.notFound().build();
         }
 
-        // 2. 优先检索磁盘精确同名文件
+        // 2. 查内存高速缓存
+        File cachedFile = assetCache.get(assetPath);
+        if (cachedFile != null && cachedFile.exists() && cachedFile.isFile()) {
+            return buildFileResponse(cachedFile);
+        }
+
+        // 3. 检索磁盘精确同名文件
         File file = new File(exportDir, assetPath);
         if (file.exists() && file.isFile()) {
+            assetCache.put(assetPath, file);
             return buildFileResponse(file);
         }
 
-        // 2. 深度递归检索导出目录下的所有子目录（包含对话 ID 子目录、audio 目录等）
+        // 4. 深度递归检索导出目录下的所有子目录（包含对话 ID 子目录、audio 目录等）
         final String searchPrefix = assetPath;
         try (var stream = Files.walk(exportDir.toPath())) {
             var match = stream
@@ -63,7 +71,8 @@ public class ChatAssetController {
 
             if (match.isPresent()) {
                 File matchedFile = match.get().toFile();
-                log.info("Asset recursive match succeeded: [{}] -> [{}]", assetPath, matchedFile.getAbsolutePath());
+                assetCache.put(assetPath, matchedFile);
+                log.debug("[ChatAssetController] 资产物理文件匹配成功并写入缓存: [{}] -> [{}]", assetPath, matchedFile.getAbsolutePath());
                 return buildFileResponse(matchedFile);
             }
         } catch (IOException e) {
