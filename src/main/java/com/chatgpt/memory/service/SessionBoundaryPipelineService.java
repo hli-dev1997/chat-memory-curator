@@ -373,7 +373,7 @@ public class SessionBoundaryPipelineService {
 
         final LlmModelEnum defaultModel = isMultimodal
                 ? LlmModelEnum.QWEN_3_VL_PLUS
-                : LlmModelEnum.QWEN_37_FLASH;
+                : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT;
 
         final LlmModelEnum modelEnum = isMultimodal
                 ? (customMultimodalModel != null ? customMultimodalModel : defaultModel)
@@ -454,7 +454,7 @@ public class SessionBoundaryPipelineService {
                 try {
                     isImageFallback = true;
                     final PromptTemplateEnum textTemplate = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
-                    final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : LlmModelEnum.QWEN_37_FLASH;
+                    final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT;
                     final ChatLanguageModel textModel = qwenModelFactory.getModel(textModelEnum);
 
                     final String fallbackPromptText = String.format(
@@ -522,7 +522,7 @@ public class SessionBoundaryPipelineService {
         }
 
         final String actualModelName = isImageFallback
-                ? (customTextModel != null ? customTextModel.getModelName() : LlmModelEnum.QWEN_37_FLASH.getModelName())
+                ? (customTextModel != null ? customTextModel.getModelName() : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT.getModelName())
                 : modelEnum.getModelName();
 
         sessionBoundaryPairMapper.updateL2Result(

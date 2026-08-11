@@ -195,7 +195,7 @@ public class SegmentationVisualizerController {
         return ResponseEntity.ok(Map.of(
                 "code", 200,
                 "message", String.format("L2 精排任务已异步启动！文本模型: %s，多模态模型: %s，强制覆盖模式: %s，目标上限: %s 条。",
-                        textEnum != null ? textEnum.getModelName() : "qwen3.7-flash(默认)",
+                        textEnum != null ? textEnum.getModelName() : "qwen3.6-flash-2026-04-16(默认)",
                         omniEnum != null ? omniEnum.getModelName() : "qwen3-vl-plus(默认)",
                         forceOverwrite,
                         maxCount > 0 ? maxCount : "全量")

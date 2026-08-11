@@ -43,7 +43,7 @@ chat:
       - assistant
 
 qwen:
-  model-name: qwen3.7-flash
+  model-name: qwen3.6-flash-2026-04-16
   base-url: https://ws-dzx3vakjj1wmjyha.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
   timeout-seconds: 60
   log-requests: true
