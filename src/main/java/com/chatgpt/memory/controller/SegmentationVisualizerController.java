@@ -105,6 +105,18 @@ public class SegmentationVisualizerController {
         }
     }
 
+    private final java.util.concurrent.atomic.AtomicReference<com.chatgpt.memory.model.dto.L2TaskStatusDTO> l2TaskStatus =
+            new java.util.concurrent.atomic.AtomicReference<>(
+                    com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
+                            .running(false)
+                            .lastError(null)
+                            .failedPairId(null)
+                            .processedCount(0)
+                            .startTime(null)
+                            .finishTime(null)
+                            .build()
+            );
+
     /**
      * 触发全量 Stage 2 千问大模型精排裁决（异步执行）
      * <p>支持选择文本与多模态模型名称，并支持强行覆盖重推导。</p>
@@ -124,6 +136,15 @@ public class SegmentationVisualizerController {
         final com.chatgpt.memory.common.enums.LlmModelEnum textEnum = parseModelEnum(textModel);
         final com.chatgpt.memory.common.enums.LlmModelEnum omniEnum = parseModelEnum(multimodalModel);
 
+        l2TaskStatus.set(com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
+                .running(true)
+                .lastError(null)
+                .failedPairId(null)
+                .processedCount(0)
+                .startTime(java.time.LocalDateTime.now())
+                .finishTime(null)
+                .build());
+
         CompletableFuture.runAsync(() -> {
             try {
                 log.info("[Controller] 开始异步触发 Stage 2 任务 | textModel: {}, omniModel: {}, forceOverwrite: {}, maxCount: {}",
@@ -132,8 +153,35 @@ public class SegmentationVisualizerController {
                         forceOverwrite, maxCount > 0 ? maxCount : "UNLIMITED");
                 final int processed = sessionBoundaryPipelineService.runStage2(textEnum, omniEnum, forceOverwrite, maxCount);
                 log.info("[Controller] 异步 Stage 2 任务顺利完成，共精排 {} 条 Pair。", processed);
+
+                l2TaskStatus.set(com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
+                        .running(false)
+                        .lastError(null)
+                        .failedPairId(null)
+                        .processedCount(processed)
+                        .startTime(l2TaskStatus.get().getStartTime())
+                        .finishTime(java.time.LocalDateTime.now())
+                        .build());
+            } catch (com.chatgpt.memory.common.exception.LlmApiException e) {
+                log.error("[Controller] 异步 Stage 2 任务触发大模型 API 熔断阻断！错误: {}", e.getMessage());
+                l2TaskStatus.set(com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
+                        .running(false)
+                        .lastError(e.getMessage())
+                        .failedPairId(null)
+                        .processedCount(l2TaskStatus.get() != null ? l2TaskStatus.get().getProcessedCount() : 0)
+                        .startTime(l2TaskStatus.get() != null ? l2TaskStatus.get().getStartTime() : null)
+                        .finishTime(java.time.LocalDateTime.now())
+                        .build());
             } catch (Exception e) {
                 log.error("[Controller] 异步 Stage 2 任务执行异常", e);
+                l2TaskStatus.set(com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
+                        .running(false)
+                        .lastError(e.getMessage() != null ? e.getMessage() : "未知执行异常")
+                        .failedPairId(null)
+                        .processedCount(l2TaskStatus.get() != null ? l2TaskStatus.get().getProcessedCount() : 0)
+                        .startTime(l2TaskStatus.get() != null ? l2TaskStatus.get().getStartTime() : null)
+                        .finishTime(java.time.LocalDateTime.now())
+                        .build());
             }
         });
 
@@ -144,6 +192,20 @@ public class SegmentationVisualizerController {
                         omniEnum != null ? omniEnum.getModelName() : "qwen3.5-omni-flash(默认)",
                         forceOverwrite,
                         maxCount > 0 ? maxCount : "全量")
+        ));
+    }
+
+    /**
+     * 获取 L2 大模型后台精排任务实时执行状态与最后一次报错详情
+     */
+    @GetMapping("/l2-task-status")
+    @Operation(summary = "获取 L2 后台推导任务状态", description = "用于前端定时轮询或监控大模型 API 熔断阻断报错与运行状态")
+    public ResponseEntity<Map<String, Object>> getL2TaskStatus() {
+        final com.chatgpt.memory.model.dto.L2TaskStatusDTO status = l2TaskStatus.get();
+        return ResponseEntity.ok(Map.of(
+                "code", 200,
+                "message", "获取任务状态成功",
+                "status", status != null ? status : Map.of()
         ));
     }
 

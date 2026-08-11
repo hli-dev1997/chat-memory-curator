@@ -1290,6 +1290,37 @@
             }
         }
 
+        let taskPollTimer = null;
+
+        // 轮询 L2 大模型后台推导任务状态
+        async function pollL2TaskStatus() {
+            try {
+                const res = await fetch('/api/v1/segmentation-visualizer/l2-task-status');
+                const json = await res.json();
+                if (json.code === 200 && json.status) {
+                    const st = json.status;
+                    loadStats();
+                    loadRecords();
+
+                    if (st.running === false) {
+                        if (taskPollTimer) {
+                            clearInterval(taskPollTimer);
+                            taskPollTimer = null;
+                        }
+                        if (st.lastError) {
+                            showCustomAlert(
+                                '⚠️ L2 大模型推导异常中断',
+                                `模型接口返回不可恢复报错：\n${st.lastError}\n\n【阻断说明】：大模型 API 余额耗尽(Free quota exhausted)或接口 Key 无效，后台任务已立刻强行熔断阻断！请充值或调整配置后重新启动。`,
+                                'error'
+                            );
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('轮询 L2 任务状态失败:', err);
+            }
+        }
+
         // 5. 按钮控制触发 Stage 2 推导
         async function triggerRunStage2(forceOverwrite) {
             const countInputId = forceOverwrite ? 'overwriteCount' : 'resumeCount';
@@ -1315,10 +1346,8 @@
                 const data = await res.json();
                 showCustomAlert('任务启动成功', data.message || 'Stage 2 推导任务已在后台异步启动！', 'success');
                 
-                setTimeout(() => {
-                    loadStats();
-                    loadRecords();
-                }, 1500);
+                if (taskPollTimer) clearInterval(taskPollTimer);
+                taskPollTimer = setInterval(pollL2TaskStatus, 2000);
             } catch (err) {
                 showCustomAlert('启动失败', '网络或服务端响应异常，无法启动 Stage 2 任务', 'error');
             }

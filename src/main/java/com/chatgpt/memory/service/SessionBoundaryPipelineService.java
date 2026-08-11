@@ -323,13 +323,19 @@ public class SessionBoundaryPipelineService {
             log.info("[Stage2] 开始处理本批 {} 条模糊区记录 (lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
                     batch.size(), lastId, forceOverwrite, totalProcessed, targetLimit);
 
-            for (final SessionBoundaryPairDO pairDO : batch) {
-                processOnePair(pairDO, customTextModel, customMultimodalModel);
-                totalProcessed++;
-                lastId = pairDO.getId();
-                if (totalProcessed >= targetLimit) {
-                    break;
+            try {
+                for (final SessionBoundaryPairDO pairDO : batch) {
+                    processOnePair(pairDO, customTextModel, customMultimodalModel);
+                    totalProcessed++;
+                    lastId = pairDO.getId();
+                    if (totalProcessed >= targetLimit) {
+                        break;
+                    }
                 }
+            } catch (com.chatgpt.memory.common.exception.LlmApiException e) {
+                log.error("[Stage2] 捕获大模型 API 不可恢复异常，批次处理在 Pair {} 强行熔断终止！已完成 {} 条。异常: {}",
+                        lastId, totalProcessed, e.getMessage());
+                throw e;
             }
         } while (totalProcessed < targetLimit && batch.size() == STAGE2_BATCH_SIZE);
 
@@ -384,8 +390,8 @@ public class SessionBoundaryPipelineService {
         String finalDecision;
         String processStatus;
 
+        final Response<AiMessage> response;
         try {
-            final Response<AiMessage> response;
             if (isMultimodal) {
                 final List<Content> contents = new ArrayList<>();
 
@@ -434,7 +440,12 @@ public class SessionBoundaryPipelineService {
                         UserMessage.from(userPromptText)
                 );
             }
+        } catch (Exception e) {
+            log.error("[Stage2] Pair {} 调起大模型 API 失败，触发强行熔断阻断: {}", pairDO.getId(), e.getMessage());
+            throw new com.chatgpt.memory.common.exception.LlmApiException("Pair " + pairDO.getId() + " 模型调用失败: " + e.getMessage(), e);
+        }
 
+        try {
             final String rawResponse = (response != null && response.content() != null)
                     ? response.content().text()
                     : "";
@@ -463,7 +474,7 @@ public class SessionBoundaryPipelineService {
                 processStatus = ProcessStatusEnum.DONE.getCode();
             }
         } catch (Exception e) {
-            log.error("[Stage2] Pair {} 解析异常，安全降级为 MERGE。错误: {}", pairDO.getId(), e.getMessage());
+            log.error("[Stage2] Pair {} 响应文本 JSON 解析异常，安全降级为 MERGE/LOW。错误: {}", pairDO.getId(), e.getMessage());
             l2Verdict    = "MERGE";
             l2Confidence = "LOW";
             l2Reason     = "JSON 解析失败，安全降级";
