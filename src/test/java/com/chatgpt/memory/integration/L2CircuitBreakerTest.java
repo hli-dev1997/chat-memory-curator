@@ -30,9 +30,9 @@ public class L2CircuitBreakerTest {
     @Test
     @DisplayName("测试大模型 API 异常强行熔断中断机制")
     public void testCircuitBreakerOnLlmApiException() {
-        // 断言传入不存在的模型配置触发 LlmApiException
+        // 断言传入已耗尽额度的模型 (QWEN_TEXT_FLASH) 触发 LlmApiException
         Assertions.assertThrows(LlmApiException.class, () -> {
-            sessionBoundaryPipelineService.runStage2(null, null, false, 5);
+            sessionBoundaryPipelineService.runStage2(com.chatgpt.memory.common.enums.LlmModelEnum.QWEN_TEXT_FLASH, null, false, 5);
         }, "当底层大模型 API 接口调用异常时，必须强制抛出 LlmApiException 并阻断任务，决不能静默降级继续处理下一个记录");
     }
 }

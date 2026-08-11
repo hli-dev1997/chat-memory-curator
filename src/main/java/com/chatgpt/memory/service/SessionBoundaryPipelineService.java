@@ -369,7 +369,7 @@ public class SessionBoundaryPipelineService {
 
         final LlmModelEnum defaultModel = isMultimodal
                 ? LlmModelEnum.QWEN_OMNI_FLASH
-                : LlmModelEnum.QWEN_TEXT_FLASH;
+                : LlmModelEnum.QWEN_37_FLASH;
 
         final LlmModelEnum modelEnum = isMultimodal
                 ? (customMultimodalModel != null ? customMultimodalModel : defaultModel)

@@ -166,7 +166,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper, times(1)).updateL2Result(
                 eq(10L), eq("MERGE"), eq("HIGH"),
                 eq("上文讨论 Redis 内存优化，下文追问内存满的异常处理"),
-                eq("qwen3.6-flash"),
+                eq("qwen3.7-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.DONE.getCode())
         );
     }
@@ -206,7 +206,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper).updateL2Result(
                 eq(20L), eq("SPLIT"), eq("LOW"),
                 eq("信息较少，无法确定关联性"),
-                eq("qwen3.6-flash"),
+                eq("qwen3.7-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode())
         );
     }
@@ -238,7 +238,7 @@ class SessionBoundaryPipelineServiceTest {
         verify(sessionBoundaryPairMapper).updateL2Result(
                 eq(30L), eq("MERGE"), eq("LOW"),
                 anyString(),
-                eq("qwen3.6-flash"),
+                eq("qwen3.7-flash"),
                 eq("MERGE"), eq(ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode())
         );
     }

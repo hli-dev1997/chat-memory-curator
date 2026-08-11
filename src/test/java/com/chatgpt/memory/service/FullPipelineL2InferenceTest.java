@@ -73,7 +73,7 @@ public class FullPipelineL2InferenceTest {
 
         // 验证文本分流模板与模型选择
         final PromptTemplateEnum template = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
-        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_TEXT_FLASH;
+        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_37_FLASH;
 
         log.info("[PipelineTest] Pair {} (无图) 路由至模型: {}, 使用 Prompt 模板: {}",
                 textPairDO.getId(), modelEnum.getModelName(), template.getCode());
@@ -86,7 +86,7 @@ public class FullPipelineL2InferenceTest {
         );
 
         final ChatLanguageModel model = qwenModelFactory.getModel(modelEnum);
-        assertNotNull(model, "文本模型 qwen3.6-flash 不能为 null");
+        assertNotNull(model, "文本模型 qwen3.7-flash 不能为 null");
 
         log.info("\n========== [Stage 2 大模型请求参数明细 (无图纯文本)] ==========\n" +
                         "- Pair ID: {}\n" +

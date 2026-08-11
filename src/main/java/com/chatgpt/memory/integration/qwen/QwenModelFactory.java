@@ -41,6 +41,12 @@ public class QwenModelFactory {
     public ChatLanguageModel getModel(final LlmModelEnum modelEnum) {
         Objects.requireNonNull(modelEnum, "modelEnum 不能为 null");
 
+        if (modelEnum.isQuotaExhausted()) {
+            log.error("[QwenModelFactory] 尝试构建已耗尽免费额度的模型 [{}] 被系统主动阻断拦截。", modelEnum.getModelName());
+            throw new com.chatgpt.memory.common.exception.LlmApiException(
+                    "模型 [" + modelEnum.getModelName() + "] 免费额度已用尽，系统已主动阻断，请切换使用最佳平替模型 qwen3.7-flash！");
+        }
+
         return modelCache.computeIfAbsent(modelEnum, enumKey -> {
             final String modelName = enumKey.getModelName();
             final int timeout = qwenProperties.getTimeoutSeconds() != null
