@@ -14,6 +14,7 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import com.chatgpt.memory.config.QwenProperties;
 import com.chatgpt.memory.integration.qwen.QwenModelFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +62,9 @@ class SessionBoundaryPipelineServiceTest {
 
     @Mock
     private QwenModelFactory qwenModelFactory;
+
+    @Spy
+    private QwenProperties qwenProperties = new QwenProperties();
 
     @Mock
     private ChatLanguageModel chatLanguageModel;

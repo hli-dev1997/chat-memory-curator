@@ -79,4 +79,24 @@ public enum LlmModelEnum {
         this.description = description;
         this.quotaExhausted = quotaExhausted;
     }
+
+    /**
+     * 根据模型名称字符串解析模型枚举项，解析失败时返回兜底默认枚举
+     *
+     * @param modelName 待解析的模型名称或枚举 Key 字符串
+     * @param fallback  兜底模型枚举项
+     * @return 对应的模型枚举项或 fallback 兜底项
+     */
+    public static LlmModelEnum fromModelName(final String modelName, final LlmModelEnum fallback) {
+        if (modelName == null || modelName.isBlank()) {
+            return fallback;
+        }
+        final String trimmed = modelName.trim();
+        for (final LlmModelEnum item : values()) {
+            if (item.name().equalsIgnoreCase(trimmed) || item.getModelName().equalsIgnoreCase(trimmed)) {
+                return item;
+            }
+        }
+        return fallback;
+    }
 }

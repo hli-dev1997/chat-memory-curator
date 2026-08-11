@@ -43,7 +43,8 @@ chat:
       - assistant
 
 qwen:
-  model-name: qwen3.6-flash-2026-04-16
+  text-model: qwen3.6-flash-2026-04-16      # 默认纯文本大语言模型 (平替推荐)
+  multimodal-model: qwen3-vl-plus          # 默认全模态视觉大模型 (平替推荐)
   base-url: https://ws-dzx3vakjj1wmjyha.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
   timeout-seconds: 60
   log-requests: true

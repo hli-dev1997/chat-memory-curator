@@ -64,6 +64,9 @@ public class SessionBoundaryPipelineService {
     /** 通义千问模型动态构建与缓存工厂 */
     private final QwenModelFactory qwenModelFactory;
 
+    /** 通义千问配置属性组件 */
+    private final com.chatgpt.memory.config.QwenProperties qwenProperties;
+
     /** JSON 序列化与反序列化工具 */
     private final ObjectMapper objectMapper;
 
@@ -371,9 +374,14 @@ public class SessionBoundaryPipelineService {
                 ? PromptTemplateEnum.L2_MULTIMODAL_SESSION_SPLIT
                 : PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
 
+        final LlmModelEnum defaultTextModelEnum = LlmModelEnum.fromModelName(
+                qwenProperties.getTextModel(), LlmModelEnum.QWEN_36_FLASH_SNAPSHOT);
+        final LlmModelEnum defaultMultimodalModelEnum = LlmModelEnum.fromModelName(
+                qwenProperties.getMultimodalModel(), LlmModelEnum.QWEN_3_VL_PLUS);
+
         final LlmModelEnum defaultModel = isMultimodal
-                ? LlmModelEnum.QWEN_3_VL_PLUS
-                : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT;
+                ? defaultMultimodalModelEnum
+                : defaultTextModelEnum;
 
         final LlmModelEnum modelEnum = isMultimodal
                 ? (customMultimodalModel != null ? customMultimodalModel : defaultModel)
@@ -454,7 +462,7 @@ public class SessionBoundaryPipelineService {
                 try {
                     isImageFallback = true;
                     final PromptTemplateEnum textTemplate = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
-                    final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT;
+                    final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : defaultTextModelEnum;
                     final ChatLanguageModel textModel = qwenModelFactory.getModel(textModelEnum);
 
                     final String fallbackPromptText = String.format(
@@ -522,7 +530,7 @@ public class SessionBoundaryPipelineService {
         }
 
         final String actualModelName = isImageFallback
-                ? (customTextModel != null ? customTextModel.getModelName() : LlmModelEnum.QWEN_36_FLASH_SNAPSHOT.getModelName())
+                ? (customTextModel != null ? customTextModel.getModelName() : defaultTextModelEnum.getModelName())
                 : modelEnum.getModelName();
 
         sessionBoundaryPairMapper.updateL2Result(
