@@ -58,26 +58,20 @@ public class QwenProperties {
     private Boolean logResponses;
 
     /**
-     * 获取有效的纯文本模型名称（优先读 textModel，退守 modelName，默认 qwen3.6-flash-2026-04-16）
+     * 获取有效的纯文本模型名称（优先读取 yml 中配置的 textModel，次之读取旧版 modelName）
      */
     public String getTextModel() {
         if (textModel != null && !textModel.isBlank()) {
             return textModel;
         }
-        if (modelName != null && !modelName.isBlank()) {
-            return modelName;
-        }
-        return "qwen3.6-27b";
+        return modelName;
     }
 
     /**
-     * 获取有效的多模态模型名称（优先读 multimodalModel，默认 qwen3-vl-plus）
+     * 获取有效的多模态模型名称
      */
     public String getMultimodalModel() {
-        if (multimodalModel != null && !multimodalModel.isBlank()) {
-            return multimodalModel;
-        }
-        return "qwen3-vl-plus";
+        return multimodalModel;
     }
 
     /**
