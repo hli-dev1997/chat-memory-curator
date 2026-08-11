@@ -395,7 +395,7 @@ public class SessionBoundaryPipelineService {
         String processStatus;
 
         Response<AiMessage> response;
-        boolean isImageFallback = false;
+        boolean isImageFallback = isHasAttachment && (imagesA.isEmpty() && imagesB.isEmpty());
         try {
             if (isMultimodal) {
                 final List<Content> contents = new ArrayList<>();
