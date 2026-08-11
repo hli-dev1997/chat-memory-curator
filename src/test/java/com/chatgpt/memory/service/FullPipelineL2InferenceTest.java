@@ -73,7 +73,7 @@ public class FullPipelineL2InferenceTest {
 
         // 验证文本分流模板与模型选择
         final PromptTemplateEnum template = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
-        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_36_27B;
+        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_PLUS;
 
         log.info("[PipelineTest] Pair {} (无图) 路由至模型: {}, 使用 Prompt 模板: {}",
                 textPairDO.getId(), modelEnum.getModelName(), template.getCode());
@@ -86,7 +86,7 @@ public class FullPipelineL2InferenceTest {
         );
 
         final ChatLanguageModel model = qwenModelFactory.getModel(modelEnum);
-        assertNotNull(model, "文本模型 qwen3.6-27b 不能为 null");
+        assertNotNull(model, "文本模型 qwen-plus 不能为 null");
 
         log.info("\n========== [Stage 2 大模型请求参数明细 (无图纯文本)] ==========\n" +
                         "- Pair ID: {}\n" +
@@ -144,7 +144,7 @@ public class FullPipelineL2InferenceTest {
 
         // 验证多模态分流模板与模型选择
         final PromptTemplateEnum template = PromptTemplateEnum.L2_MULTIMODAL_SESSION_SPLIT;
-        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_3_VL_PLUS;
+        final LlmModelEnum modelEnum = LlmModelEnum.OMNI_QWEN3_FLASH;
 
         final List<Content> contents = new ArrayList<>();
         final String l1ScoreStr = imagePairDO.getL1Score().toPlainString();
@@ -173,7 +173,7 @@ public class FullPipelineL2InferenceTest {
         ));
 
         final ChatLanguageModel model = qwenModelFactory.getModel(modelEnum);
-        assertNotNull(model, "全模态模型 qwen3.5-omni-flash 不能为 null");
+        assertNotNull(model, "全模态模型 qwen3-omni-flash 不能为 null");
 
         log.info("\n========== [Stage 2 大模型请求参数明细 (有图多模态)] ==========\n" +
                         "- Pair ID: {}\n" +

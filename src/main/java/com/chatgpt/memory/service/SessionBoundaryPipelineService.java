@@ -2,6 +2,7 @@ package com.chatgpt.memory.service;
 
 import com.chatgpt.memory.common.enums.L1ZoneEnum;
 import com.chatgpt.memory.common.enums.LlmModelEnum;
+import com.chatgpt.memory.common.enums.ModelTypeEnum;
 import com.chatgpt.memory.common.enums.ProcessStatusEnum;
 import com.chatgpt.memory.common.enums.PromptTemplateEnum;
 import com.chatgpt.memory.integration.qwen.QwenClient;
@@ -412,9 +413,9 @@ public class SessionBoundaryPipelineService {
                 : PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
 
         final LlmModelEnum defaultTextModelEnum = LlmModelEnum.fromModelName(
-                qwenProperties.getTextModel(), LlmModelEnum.QWEN_36_FLASH_SNAPSHOT);
+                qwenProperties.getTextModel(), ModelTypeEnum.TEXT, LlmModelEnum.QWEN_PLUS);
         final LlmModelEnum defaultMultimodalModelEnum = LlmModelEnum.fromModelName(
-                qwenProperties.getMultimodalModel(), LlmModelEnum.QWEN_3_VL_PLUS);
+                qwenProperties.getMultimodalModel(), ModelTypeEnum.MULTIMODAL, LlmModelEnum.OMNI_QWEN3_FLASH);
 
         final LlmModelEnum defaultModel = isMultimodal
                 ? defaultMultimodalModelEnum
