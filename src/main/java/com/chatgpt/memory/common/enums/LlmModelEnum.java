@@ -11,14 +11,19 @@ import lombok.Getter;
 public enum LlmModelEnum {
 
     /**
-     * 最佳平替推荐：通义千问 3.6 Flash 日期快照版（1,000,000 免费 Token 最佳平替）
+     * 最佳平替推荐：通义千问 3.6 27B 参数轻量模型（1,000,000 免费 Token 最佳平替）
      */
-    QWEN_36_FLASH_SNAPSHOT("qwen3.6-flash-2026-04-16", ModelTypeEnum.TEXT, "通义千问 3.6 Flash 日期快照版（最佳平替推荐）", false),
+    QWEN_36_27B("qwen3.6-27b", ModelTypeEnum.TEXT, "通义千问 3.6 27B 轻量文本模型（最佳平替推荐）", false),
 
     /**
-     * 备选平替：通义千问 3.6 27B 参数轻量模型
+     * 备选平替：通义千问 3 235B 超大参数开源模型
      */
-    QWEN_36_27B("qwen3.6-27b", ModelTypeEnum.TEXT, "通义千问 3.6 27B 轻量文本模型", false),
+    QWEN_3_235B_A22B("qwen3-235b-a22b", ModelTypeEnum.TEXT, "通义千问 3 235B 超大参数开源模型", false),
+
+    /**
+     * 备选平替：通义千问 Coder Plus 代码增强模型
+     */
+    QWEN_CODER_PLUS("qwen-coder-plus", ModelTypeEnum.TEXT, "通义千问 Coder Plus 代码模型", false),
 
     /**
      * 备选平替：通义千问 Plus 日期快照版
@@ -39,6 +44,11 @@ public enum LlmModelEnum {
      * 高准度增强平替：通义千问 3.7 Plus 高精度文本模型
      */
     QWEN_37_PLUS("qwen3.7-plus", ModelTypeEnum.TEXT, "通义千问 3.7 Plus 高精度文本模型", false),
+
+    /**
+     * 纯文本极速模型快照版（免费额度已耗尽）
+     */
+    QWEN_36_FLASH_SNAPSHOT("qwen3.6-flash-2026-04-16", ModelTypeEnum.TEXT, "通义千问 3.6 Flash 日期快照版（额度已耗尽）", true),
 
     /**
      * 纯文本极速模型（免费额度已耗尽）

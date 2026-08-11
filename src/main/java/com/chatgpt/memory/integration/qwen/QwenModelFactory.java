@@ -44,7 +44,7 @@ public class QwenModelFactory {
         if (modelEnum.isQuotaExhausted()) {
             log.error("[QwenModelFactory] 尝试构建已耗尽免费额度的模型 [{}] 被系统主动阻断拦截。", modelEnum.getModelName());
             throw new com.chatgpt.memory.common.exception.LlmApiException(
-                    "模型 [" + modelEnum.getModelName() + "] 免费额度已用尽，系统已主动阻断，请切换使用最佳平替模型 qwen3.6-flash-2026-04-16！");
+                    "模型 [" + modelEnum.getModelName() + "] 免费额度已用尽，系统已主动阻断，请在 application.yml 中切换使用最佳平替模型 qwen3.6-27b！");
         }
 
         return modelCache.computeIfAbsent(modelEnum, enumKey -> {

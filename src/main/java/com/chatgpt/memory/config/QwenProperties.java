@@ -28,9 +28,9 @@ public class QwenProperties {
     private String baseUrl;
 
     /**
-     * 默认纯文本大语言模型名称，如 qwen3.6-flash-2026-04-16
+     * 默认纯文本大语言模型名称，如 qwen3.6-27b
      */
-    private String textModel = "qwen3.6-flash-2026-04-16";
+    private String textModel = "qwen3.6-27b";
 
     /**
      * 默认全模态大模型名称，如 qwen3-vl-plus
@@ -67,7 +67,7 @@ public class QwenProperties {
         if (modelName != null && !modelName.isBlank()) {
             return modelName;
         }
-        return "qwen3.6-flash-2026-04-16";
+        return "qwen3.6-27b";
     }
 
     /**
