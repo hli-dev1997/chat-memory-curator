@@ -37,6 +37,7 @@ chat:
     l2-auto-run-enabled: false # 设置为 false，禁止应用启动时自动跑 L2，改为通过页面按钮手动触发
     l2-auto-run-limit: 100    # 定量记录数上限（由页面输入框参数覆盖控制）
     l2-force-overwrite: true  # 覆盖推导开关
+    l2-concurrency-limit: 15  # Stage 2 大模型响应式并发推导上限通道数 (支持按 API 限流调整)
   parser:
     retain-roles:
       - user

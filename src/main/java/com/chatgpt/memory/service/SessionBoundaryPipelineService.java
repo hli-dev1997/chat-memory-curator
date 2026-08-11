@@ -29,6 +29,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,6 +40,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 会话切分三阶段流水线服务类
@@ -81,6 +88,10 @@ public class SessionBoundaryPipelineService {
     /** 启动时是否自动运行 Stage 2 L2 精排推导 */
     @Value("${chat.segmentation.l2-auto-run-enabled:false}")
     private boolean autoRunEnabled;
+
+    /** Stage 2 大模型响应式高并发处理上限通道数 (预设 15 并发) */
+    @Value("${chat.segmentation.l2-concurrency-limit:15}")
+    private int l2ConcurrencyLimit;
 
     /** 启动时自动运行的定量处理上限条数 */
     @Value("${chat.segmentation.l2-auto-run-limit:100}")
@@ -295,10 +306,10 @@ public class SessionBoundaryPipelineService {
     }
 
     /**
-     * Stage 2：扫描模糊区记录并调用大模型精排（支持自定义指定模型、强行覆盖与定量上限截断）
+     * Stage 2：扫描模糊区记录并调用大模型精排（响应式高并发流架构，支持并发通道控流与秒级熔断）
      *
-     * @param customTextModel       自定义文本模型枚举（可为空，默认 QWEN_TEXT_FLASH）
-     * @param customMultimodalModel 自定义多模态模型枚举（可为空，默认 QWEN_OMNI_FLASH）
+     * @param customTextModel       自定义文本模型枚举（可为空，默认读取 application.yml 中的配置）
+     * @param customMultimodalModel 自定义多模态模型枚举（可为空，默认读取 application.yml 中的配置）
      * @param forceOverwrite        是否强行覆盖已有的 L2 裁决记录（true：重新推导全量 FUZZY 区 Pair；false：仅推导未裁决的 FUZZY 区 Pair）
      * @param maxCount              定量处理最大记录条数上限（例如 100 条）
      * @return 批次精排完成的 Pair 记录条数
@@ -308,13 +319,19 @@ public class SessionBoundaryPipelineService {
                          final boolean forceOverwrite,
                          final int maxCount) {
         final int targetLimit = maxCount > 0 ? maxCount : Integer.MAX_VALUE;
-        int totalProcessed = 0;
+        final int concurrency = l2ConcurrencyLimit > 0 ? l2ConcurrencyLimit : 15;
+
+        final AtomicInteger totalProcessed = new AtomicInteger(0);
+        final AtomicBoolean isCircuitBroken = new AtomicBoolean(false);
+        final AtomicLong lastProcessedId = new AtomicLong(0L);
+        final AtomicReference<Throwable> firstError = new AtomicReference<>();
+
         Long lastId = 0L;
         List<SessionBoundaryPairDO> batch;
 
         do {
-            final int currentBatchSize = Math.min(STAGE2_BATCH_SIZE, targetLimit - totalProcessed);
-            if (currentBatchSize <= 0) {
+            final int currentBatchSize = Math.min(STAGE2_BATCH_SIZE, targetLimit - totalProcessed.get());
+            if (currentBatchSize <= 0 || isCircuitBroken.get()) {
                 break;
             }
 
@@ -323,27 +340,47 @@ public class SessionBoundaryPipelineService {
                 break;
             }
 
-            log.info("[Stage2] 开始处理本批 {} 条模糊区记录 (lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
-                    batch.size(), lastId, forceOverwrite, totalProcessed, targetLimit);
+            log.info("[Stage2-Reactive] 开始响应式高并发处理本批 {} 条模糊区记录 (并发通道上限={}, lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
+                    batch.size(), concurrency, lastId, forceOverwrite, totalProcessed.get(), targetLimit);
 
             try {
-                for (final SessionBoundaryPairDO pairDO : batch) {
-                    processOnePair(pairDO, customTextModel, customMultimodalModel);
-                    totalProcessed++;
-                    lastId = pairDO.getId();
-                    if (totalProcessed >= targetLimit) {
-                        break;
-                    }
-                }
-            } catch (com.chatgpt.memory.common.exception.LlmApiException e) {
-                log.error("[Stage2] 捕获大模型 API 不可恢复异常，批次处理在 Pair {} 强行熔断终止！已完成 {} 条。异常: {}",
-                        lastId, totalProcessed, e.getMessage());
-                throw e;
+                Flux.fromIterable(batch)
+                        .takeUntil(pair -> isCircuitBroken.get())
+                        .flatMap(pairDO -> Mono.fromRunnable(() -> {
+                                    if (isCircuitBroken.get()) {
+                                        return;
+                                    }
+                                    processOnePair(pairDO, customTextModel, customMultimodalModel);
+                                    totalProcessed.incrementAndGet();
+                                    lastProcessedId.accumulateAndGet(pairDO.getId(), Math::max);
+                                })
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .doOnError(com.chatgpt.memory.common.exception.LlmApiException.class, e -> {
+                                    log.error("[Stage2-Reactive] 捕获大模型 API 不可恢复异常，批次处理触发响应式强行熔断！异常: {}", e.getMessage());
+                                    isCircuitBroken.set(true);
+                                    firstError.compareAndSet(null, e);
+                                }), concurrency)
+                        .collectList()
+                        .block();
+            } catch (Exception e) {
+                log.error("[Stage2-Reactive] 响应式并发批处理异常终止: {}", e.getMessage());
             }
-        } while (totalProcessed < targetLimit && batch.size() == STAGE2_BATCH_SIZE);
 
-        log.info("[Stage2] L2 精排裁决完成，共定量处理 {} 条 Pair 记录。", totalProcessed);
-        return totalProcessed;
+            if (isCircuitBroken.get()) {
+                Throwable cause = firstError.get();
+                if (cause instanceof com.chatgpt.memory.common.exception.LlmApiException llmEx) {
+                    throw llmEx;
+                } else {
+                    throw new com.chatgpt.memory.common.exception.LlmApiException(
+                            "Stage 2 响应式高并发推导异常阻断中断: " + (cause != null ? cause.getMessage() : "模型 API 异常"), cause);
+                }
+            }
+
+            lastId = lastProcessedId.get();
+        } while (totalProcessed.get() < targetLimit && batch.size() == STAGE2_BATCH_SIZE);
+
+        log.info("[Stage2-Reactive] L2 高并发精排裁决完成，共高效处理 {} 条 Pair 记录。", totalProcessed.get());
+        return totalProcessed.get();
     }
 
     /**
