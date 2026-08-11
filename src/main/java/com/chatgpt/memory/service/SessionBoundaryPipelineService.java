@@ -395,6 +395,7 @@ public class SessionBoundaryPipelineService {
         String processStatus;
 
         Response<AiMessage> response;
+        boolean isImageFallback = false;
         try {
             if (isMultimodal) {
                 final List<Content> contents = new ArrayList<>();
@@ -451,6 +452,7 @@ public class SessionBoundaryPipelineService {
             if (isMultimodal && isImageError) {
                 log.warn("[Stage2] Pair {} 全模态图片格式受损或无法被模型打开，自动退守纯语言模型重试: {}", pairDO.getId(), errorMsg);
                 try {
+                    isImageFallback = true;
                     final PromptTemplateEnum textTemplate = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
                     final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : LlmModelEnum.QWEN_37_FLASH;
                     final ChatLanguageModel textModel = qwenModelFactory.getModel(textModelEnum);
@@ -496,7 +498,13 @@ public class SessionBoundaryPipelineService {
             l2Confidence = getTextSafe(node, "confidence");
             l2Reason     = getTextSafe(node, "reason");
 
-            if ("LOW".equalsIgnoreCase(l2Confidence)) {
+            if (isImageFallback) {
+                log.warn("[Stage2] Pair {} 因图片解析受损退守纯语言模型，强制归为 LOW 置信度与待人审(NEED_MANUAL_REVIEW)状态。", pairDO.getId());
+                l2Confidence = "LOW";
+                l2Reason = "[图片解析受损退守纯文本] " + (l2Reason != null ? l2Reason : "");
+                finalDecision = "MERGE";
+                processStatus = ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode();
+            } else if ("LOW".equalsIgnoreCase(l2Confidence)) {
                 log.warn("[Stage2] Pair {} 置信度过低(LOW)，转入人工复核。", pairDO.getId());
                 finalDecision = "MERGE";
                 processStatus = ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode();
@@ -508,7 +516,7 @@ public class SessionBoundaryPipelineService {
             log.error("[Stage2] Pair {} 响应文本 JSON 解析异常，安全降级为 MERGE/LOW。错误: {}", pairDO.getId(), e.getMessage());
             l2Verdict    = "MERGE";
             l2Confidence = "LOW";
-            l2Reason     = "JSON 解析失败，安全降级";
+            l2Reason     = isImageFallback ? "[图片解析受损退守纯文本] JSON 解析失败" : "JSON 解析失败，安全降级";
             finalDecision = "MERGE";
             processStatus = ProcessStatusEnum.NEED_MANUAL_REVIEW.getCode();
         }
