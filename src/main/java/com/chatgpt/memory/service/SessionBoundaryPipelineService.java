@@ -362,7 +362,11 @@ public class SessionBoundaryPipelineService {
     private void processOnePair(final SessionBoundaryPairDO pairDO,
                                 final LlmModelEnum customTextModel,
                                 final LlmModelEnum customMultimodalModel) {
-        final boolean isMultimodal = Integer.valueOf(1).equals(pairDO.getHasAttachment());
+        final boolean isHasAttachment = Integer.valueOf(1).equals(pairDO.getHasAttachment());
+        final List<String> imagesA = isHasAttachment ? ImageBase64Util.extractBase64Images(pairDO.getMessageAText()) : Collections.emptyList();
+        final List<String> imagesB = isHasAttachment ? ImageBase64Util.extractBase64Images(pairDO.getMessageBText()) : Collections.emptyList();
+        final boolean isMultimodal = isHasAttachment && (!imagesA.isEmpty() || !imagesB.isEmpty());
+
         final PromptTemplateEnum template = isMultimodal
                 ? PromptTemplateEnum.L2_MULTIMODAL_SESSION_SPLIT
                 : PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
@@ -390,7 +394,7 @@ public class SessionBoundaryPipelineService {
         String finalDecision;
         String processStatus;
 
-        final Response<AiMessage> response;
+        Response<AiMessage> response;
         try {
             if (isMultimodal) {
                 final List<Content> contents = new ArrayList<>();
@@ -401,7 +405,6 @@ public class SessionBoundaryPipelineService {
                         l1ScoreStr, pairDO.getMessageAText());
                 contents.add(TextContent.from(headerA));
 
-                final List<String> imagesA = ImageBase64Util.extractBase64Images(pairDO.getMessageAText());
                 for (final String dataUri : imagesA) {
                     contents.add(ImageContent.from(dataUri));
                 }
@@ -412,7 +415,6 @@ public class SessionBoundaryPipelineService {
                         pairDO.getMessageBText());
                 contents.add(TextContent.from(headerB));
 
-                final List<String> imagesB = ImageBase64Util.extractBase64Images(pairDO.getMessageBText());
                 for (final String dataUri : imagesB) {
                     contents.add(ImageContent.from(dataUri));
                 }
@@ -441,8 +443,37 @@ public class SessionBoundaryPipelineService {
                 );
             }
         } catch (Exception e) {
-            log.error("[Stage2] Pair {} 调起大模型 API 失败，触发强行熔断阻断: {}", pairDO.getId(), e.getMessage());
-            throw new com.chatgpt.memory.common.exception.LlmApiException("Pair " + pairDO.getId() + " 模型调用失败: " + e.getMessage(), e);
+            final String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            final boolean isImageError = errorMsg.contains("image format")
+                    || errorMsg.contains("cannot be opened")
+                    || errorMsg.contains("invalid_parameter_error");
+
+            if (isMultimodal && isImageError) {
+                log.warn("[Stage2] Pair {} 全模态图片格式受损或无法被模型打开，自动退守纯语言模型重试: {}", pairDO.getId(), errorMsg);
+                try {
+                    final PromptTemplateEnum textTemplate = PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
+                    final LlmModelEnum textModelEnum = customTextModel != null ? customTextModel : LlmModelEnum.QWEN_37_FLASH;
+                    final ChatLanguageModel textModel = qwenModelFactory.getModel(textModelEnum);
+
+                    final String fallbackPromptText = String.format(
+                            textTemplate.getUserPromptTemplate(),
+                            l1ScoreStr,
+                            pairDO.getMessageAText(),
+                            pairDO.getMessageBText());
+
+                    log.info("[Stage2-Request] Pair {} -> (降级退守) 调起纯语言模型 [{}]", pairDO.getId(), textModelEnum.getModelName());
+                    response = textModel.generate(
+                            SystemMessage.from(textTemplate.getSystemPrompt()),
+                            UserMessage.from(fallbackPromptText)
+                    );
+                } catch (Exception fallbackEx) {
+                    log.error("[Stage2] Pair {} 降级退守纯语言模型重试失败: {}", pairDO.getId(), fallbackEx.getMessage());
+                    throw new com.chatgpt.memory.common.exception.LlmApiException("Pair " + pairDO.getId() + " 模型调用失败: " + fallbackEx.getMessage(), fallbackEx);
+                }
+            } else {
+                log.error("[Stage2] Pair {} 调起大模型 API 失败，触发强行熔断阻断: {}", pairDO.getId(), errorMsg);
+                throw new com.chatgpt.memory.common.exception.LlmApiException("Pair " + pairDO.getId() + " 模型调用失败: " + errorMsg, e);
+            }
         }
 
         try {

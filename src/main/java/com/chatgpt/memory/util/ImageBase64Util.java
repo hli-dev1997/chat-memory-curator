@@ -127,9 +127,14 @@ public final class ImageBase64Util {
 
         try {
             final byte[] bytes = Files.readAllBytes(file.toPath());
+            final String mimeType = detectImageMimeType(bytes, file.getName());
+            if (mimeType == null) {
+                log.warn("[ImageBase64Util] 图片文件 Magic Bytes 校验失败 (非标准 PNG/JPEG/WEBP/GIF/BMP 格式或文件已损坏): {}", file.getAbsolutePath());
+                return null;
+            }
+
             final String base64 = Base64.getEncoder().encodeToString(bytes);
-            final String mimeType = getMimeType(file.getName());
-            log.debug("[ImageBase64Util] 成功转码本地图片为 Base64 | 文件: {}, 字节数: {}", file.getName(), bytes.length);
+            log.debug("[ImageBase64Util] 成功转码本地图片为 Base64 | 文件: {}, MIME: {}, 字节数: {}", file.getName(), mimeType, bytes.length);
             return "data:" + mimeType + ";base64," + base64;
         } catch (IOException e) {
             log.error("[ImageBase64Util] 读取图片文件失败: {}", file.getAbsolutePath(), e);
@@ -138,25 +143,54 @@ public final class ImageBase64Util {
     }
 
     /**
-     * 根据文件名后缀推导 MIME 类型
+     * 校验 byte 数组头标志 (Magic Bytes) 并获取标准 MIME 类型。
+     * 支持 PNG, JPEG, GIF, WEBP, BMP。若校验失败则返回 null。
      *
-     * @param fileName 文件名称
-     * @return MIME 字符串
+     * @param bytes 文件字节数组
+     * @param fileName 文件名（用于辅助判断后缀名）
+     * @return MIME 字符串，若非合法图片格式则返回 null
      */
-    private static String getMimeType(final String fileName) {
-        final String lower = fileName.toLowerCase();
-        if (lower.endsWith(".png")) {
+    private static String detectImageMimeType(final byte[] bytes, final String fileName) {
+        if (bytes == null || bytes.length < 4) {
+            return null;
+        }
+
+        // PNG: 89 50 4E 47
+        if ((bytes[0] & 0xFF) == 0x89 && (bytes[1] & 0xFF) == 0x50 &&
+            (bytes[2] & 0xFF) == 0x4E && (bytes[3] & 0xFF) == 0x47) {
             return "image/png";
         }
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+
+        // JPEG: FF D8 FF
+        if ((bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8 && (bytes[2] & 0xFF) == 0xFF) {
             return "image/jpeg";
         }
-        if (lower.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (lower.endsWith(".gif")) {
+
+        // GIF: 47 49 46 38 ("GIF8")
+        if (bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
             return "image/gif";
         }
-        return "image/png";
+
+        // WEBP: 52 49 46 46 ... 57 45 42 50 ("RIFF" ... "WEBP")
+        if (bytes.length >= 12 &&
+            bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F' &&
+            bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
+            return "image/webp";
+        }
+
+        // BMP: 42 4D ("BM")
+        if (bytes[0] == 'B' && bytes[1] == 'M') {
+            return "image/bmp";
+        }
+
+        // 若后缀明确且匹配常见格式，兜底返回
+        final String lower = fileName != null ? fileName.toLowerCase() : "";
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".bmp")) return "image/bmp";
+
+        return null;
     }
 }
