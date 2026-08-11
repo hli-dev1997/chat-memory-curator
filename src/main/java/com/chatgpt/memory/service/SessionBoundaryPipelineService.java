@@ -368,7 +368,7 @@ public class SessionBoundaryPipelineService {
                 : PromptTemplateEnum.L2_FUZZY_SESSION_SPLIT;
 
         final LlmModelEnum defaultModel = isMultimodal
-                ? LlmModelEnum.QWEN_OMNI_FLASH
+                ? LlmModelEnum.QWEN_3_VL_PLUS
                 : LlmModelEnum.QWEN_37_FLASH;
 
         final LlmModelEnum modelEnum = isMultimodal

@@ -90,11 +90,11 @@ public class MultimodalSessionSplitterTest {
 
         contents.add(TextContent.from("\n\n【裁决任务说明】：\n请结合上述紧跟文本顺序的 Chunk A 及其图片与 Chunk B 及其图片，判断 Chunk B 是否与 Chunk A 属于同一会话上下文，并按指定 JSON 格式输出判定结果。"));
 
-        // 4. 调用通义千问全模态首选模型 qwen3.5-omni-flash 实例
-        final ChatLanguageModel omniModel = qwenModelFactory.getModel(LlmModelEnum.QWEN_OMNI_FLASH);
-        assertNotNull(omniModel, "获取的 qwen3.5-omni-flash 模型 Bean 不能为 null");
+        // 4. 调用通义千问全模态推荐模型 qwen3-vl-plus 实例
+        final ChatLanguageModel omniModel = qwenModelFactory.getModel(LlmModelEnum.QWEN_3_VL_PLUS);
+        assertNotNull(omniModel, "获取的 qwen3-vl-plus 模型 Bean 不能为 null");
 
-        log.info("[MultimodalTest] 开始发送多模态图文请求给 qwen3.5-omni-flash 模型...");
+        log.info("[MultimodalTest] 开始发送多模态图文请求给 qwen3-vl-plus 模型...");
         final Response<AiMessage> response = omniModel.generate(
                 SystemMessage.from(template.getSystemPrompt()),
                 UserMessage.from(contents)

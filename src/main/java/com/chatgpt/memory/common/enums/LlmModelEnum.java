@@ -36,9 +36,14 @@ public enum LlmModelEnum {
     QWEN_TEXT_FLASH("qwen3.6-flash", ModelTypeEnum.TEXT, "通义千问 3.6 Flash 纯文本极速模型（额度已耗尽）", true),
 
     /**
-     * 全模态首选模型：识图、文字提取、图文上下文推理（默认视觉模型）
+     * 最佳平替推荐：通义千问 3 VL Plus 高精度全模态模型（最新一代视觉多模态）
      */
-    QWEN_OMNI_FLASH("qwen3.5-omni-flash", ModelTypeEnum.MULTIMODAL, "通义千问 3.5 Omni 轻量全模态模型", false),
+    QWEN_3_VL_PLUS("qwen3-vl-plus", ModelTypeEnum.MULTIMODAL, "通义千问 3 VL Plus 高精度全模态模型（最佳平替推荐）", false),
+
+    /**
+     * 全模态轻量模型（免费额度已耗尽）
+     */
+    QWEN_OMNI_FLASH("qwen3.5-omni-flash", ModelTypeEnum.MULTIMODAL, "通义千问 3.5 Omni 轻量全模态模型（额度已耗尽）", true),
 
     /**
      * 高精度全模态模型：复杂表格、长图、手写体、深度图文推理场景

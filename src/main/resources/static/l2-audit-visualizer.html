@@ -916,6 +916,7 @@
             updateButtonTexts();
             loadStats();
             loadRecords();
+            pollL2TaskStatus(); // 页面加载时自动轮询任务状态与报错
 
             // 全局代理 Chunk 消息区图片的点击事件（点击图片即触发全屏放大）
             document.addEventListener('click', (e) => {
@@ -1222,6 +1223,8 @@
             });
         }
 
+        let activeAlertResolve = null;
+
         // 自定义优雅居中提示框
         function showCustomAlert(title, message, type = 'info') {
             return new Promise((resolve) => {
@@ -1231,6 +1234,12 @@
                 const iconEl = document.getElementById('dialogIcon');
                 const btnCancel = document.getElementById('dialogBtnCancel');
                 const btnConfirm = document.getElementById('dialogBtnConfirm');
+
+                if (activeAlertResolve) {
+                    activeAlertResolve();
+                    activeAlertResolve = null;
+                }
+                activeAlertResolve = resolve;
 
                 titleEl.innerText = title || '系统提示';
                 msgEl.innerText = message || '';
@@ -1251,16 +1260,16 @@
                 }
 
                 btnConfirm.innerText = '好的';
-
                 overlay.classList.add('active');
 
-                const onConfirm = () => {
+                btnConfirm.onclick = () => {
                     overlay.classList.remove('active');
-                    btnConfirm.removeEventListener('click', onConfirm);
-                    resolve();
+                    if (activeAlertResolve) {
+                        const res = activeAlertResolve;
+                        activeAlertResolve = null;
+                        res();
+                    }
                 };
-
-                btnConfirm.addEventListener('click', onConfirm);
             });
         }
 
@@ -1291,6 +1300,7 @@
         }
 
         let taskPollTimer = null;
+        let lastAlertedError = null;
 
         // 轮询 L2 大模型后台推导任务状态
         async function pollL2TaskStatus() {
@@ -1302,12 +1312,17 @@
                     loadStats();
                     loadRecords();
 
-                    if (st.running === false) {
+                    if (st.running) {
+                        if (!taskPollTimer) {
+                            taskPollTimer = setInterval(pollL2TaskStatus, 2000);
+                        }
+                    } else {
                         if (taskPollTimer) {
                             clearInterval(taskPollTimer);
                             taskPollTimer = null;
                         }
-                        if (st.lastError) {
+                        if (st.lastError && st.lastError !== lastAlertedError) {
+                            lastAlertedError = st.lastError;
                             showCustomAlert(
                                 '⚠️ L2 大模型推导异常中断',
                                 `模型接口返回不可恢复报错：\n${st.lastError}\n\n【阻断说明】：大模型 API 余额耗尽(Free quota exhausted)或接口 Key 无效，后台任务已立刻强行熔断阻断！请充值或调整配置后重新启动。`,
@@ -1335,6 +1350,7 @@
             }
 
             try {
+                lastAlertedError = null; // 重置已报警错误记录
                 const formData = new FormData();
                 formData.append('forceOverwrite', forceOverwrite ? 'true' : 'false');
                 formData.append('maxCount', maxCount.toString());

@@ -144,7 +144,7 @@ public class FullPipelineL2InferenceTest {
 
         // 验证多模态分流模板与模型选择
         final PromptTemplateEnum template = PromptTemplateEnum.L2_MULTIMODAL_SESSION_SPLIT;
-        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_OMNI_FLASH;
+        final LlmModelEnum modelEnum = LlmModelEnum.QWEN_3_VL_PLUS;
 
         final List<Content> contents = new ArrayList<>();
         final String l1ScoreStr = imagePairDO.getL1Score().toPlainString();
