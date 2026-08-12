@@ -152,12 +152,14 @@
         LIMIT #{limit}
     </select>
 
-    <!-- Stage 2：扫描待推导的 Pair 记录（支持游标分页、增量与全量覆盖，始终保护人工手动覆写状态） -->
+    <!-- Stage 2：扫描待推导的 Pair 记录（支持大区动态筛选、游标分页、增量与全量覆盖，始终保护人工手动覆写状态） -->
     <select id="selectL2ProcessList" resultMap="BaseResultMap">
         SELECT *
         FROM `session_boundary_pair`
-        WHERE `l1_zone` = 'FUZZY'
-          AND `process_status` != 'MANUAL_OVERRIDE'
+        WHERE `process_status` != 'MANUAL_OVERRIDE'
+        <if test="l1Zone != null and l1Zone != '' and l1Zone != 'ALL'">
+          AND `l1_zone` = #{l1Zone}
+        </if>
         <if test="lastId != null and lastId > 0">
           AND `id` &gt; #{lastId}
         </if>
@@ -293,12 +295,27 @@
             SUM(CASE WHEN `has_attachment` = 1 THEN 1 ELSE 0 END) AS totalFuzzyImages,
             SUM(CASE WHEN `has_attachment` = 0 THEN 1 ELSE 0 END) AS totalFuzzyText,
             SUM(CASE WHEN `l2_verdict` IS NOT NULL THEN 1 ELSE 0 END) AS totalJudged,
-            SUM(CASE WHEN `l2_verdict` IS NULL THEN 1 ELSE 0 END) AS totalPending,
+            SUM(CASE WHEN `l2_verdict` IS NULL AND `process_status` != 'MANUAL_OVERRIDE' THEN 1 ELSE 0 END) AS totalPending,
             SUM(CASE WHEN `l2_verdict` = 'MERGE' THEN 1 ELSE 0 END) AS totalMerge,
             SUM(CASE WHEN `l2_verdict` = 'SPLIT' THEN 1 ELSE 0 END) AS totalSplit,
-            SUM(CASE WHEN `process_status` = 'NEED_MANUAL_REVIEW' THEN 1 ELSE 0 END) AS totalReview
+            SUM(CASE WHEN `process_status` = 'NEED_MANUAL_REVIEW' THEN 1 ELSE 0 END) AS totalReview,
+            SUM(CASE WHEN `process_status` = 'MANUAL_OVERRIDE' THEN 1 ELSE 0 END) AS totalManualOverride
         FROM `session_boundary_pair`
         WHERE `l1_zone` = 'FUZZY'
+    </select>
+
+    <!-- 统计 L1 向量模型对比 L2 大模型裁决的准确度及误判归因 -->
+    <select id="selectL1AccuracyStats" resultType="map">
+        SELECT
+            COUNT(1) AS totalEvaluated,
+            SUM(CASE WHEN `l1_zone` = 'GREEN_MERGE' AND `l2_verdict` = 'MERGE' THEN 1 ELSE 0 END) AS trueMerge,
+            SUM(CASE WHEN `l1_zone` = 'GREEN_MERGE' AND `l2_verdict` = 'SPLIT' THEN 1 ELSE 0 END) AS falseMerge,
+            SUM(CASE WHEN `l1_zone` = 'RED_SPLIT' AND `l2_verdict` = 'SPLIT' THEN 1 ELSE 0 END) AS trueSplit,
+            SUM(CASE WHEN `l1_zone` = 'RED_SPLIT' AND `l2_verdict` = 'MERGE' THEN 1 ELSE 0 END) AS falseSplit,
+            SUM(CASE WHEN `l1_zone` = 'FUZZY' AND `l2_verdict` IS NOT NULL THEN 1 ELSE 0 END) AS fuzzyRefined
+        FROM `session_boundary_pair`
+        WHERE `l2_verdict` IS NOT NULL
+          AND `l1_zone` IN ('GREEN_MERGE', 'RED_SPLIT', 'FUZZY')
     </select>
 
     <!-- =====================================================================

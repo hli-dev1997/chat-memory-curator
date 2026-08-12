@@ -319,8 +319,27 @@ public class SessionBoundaryPipelineService {
                          final LlmModelEnum customMultimodalModel,
                          final boolean forceOverwrite,
                          final int maxCount) {
+        return runStage2(customTextModel, customMultimodalModel, forceOverwrite, maxCount, "ALL");
+    }
+
+    /**
+     * Stage 2：扫描指定大区/全量大区记录并调用大模型精排（响应式高并发流架构，支持并发通道控流与秒级熔断）
+     *
+     * @param customTextModel       自定义文本模型枚举（可为空，默认读取 application.yml 中的配置）
+     * @param customMultimodalModel 自定义多模态模型枚举（可为空，默认读取 application.yml 中的配置）
+     * @param forceOverwrite        是否强行覆盖已有的 L2 裁决记录（true：重新推导匹配的 Pair；false：仅推导未裁决的 Pair）
+     * @param maxCount              定量处理最大记录条数上限（例如 100 条）
+     * @param l1Zone                指定推导大区（FUZZY / GREEN_MERGE / RED_SPLIT / ALL，默认 ALL 处理全量）
+     * @return 批次精排完成的 Pair 记录条数
+     */
+    public int runStage2(final LlmModelEnum customTextModel,
+                         final LlmModelEnum customMultimodalModel,
+                         final boolean forceOverwrite,
+                         final int maxCount,
+                         final String l1Zone) {
         final int targetLimit = maxCount > 0 ? maxCount : Integer.MAX_VALUE;
         final int concurrency = l2ConcurrencyLimit > 0 ? l2ConcurrencyLimit : 15;
+        final String effectiveZone = (l1Zone != null && !l1Zone.isBlank()) ? l1Zone.trim() : "ALL";
 
         final AtomicInteger totalProcessed = new AtomicInteger(0);
         final AtomicBoolean isCircuitBroken = new AtomicBoolean(false);
@@ -336,13 +355,13 @@ public class SessionBoundaryPipelineService {
                 break;
             }
 
-            batch = sessionBoundaryPairMapper.selectL2ProcessList(forceOverwrite, lastId, currentBatchSize);
+            batch = sessionBoundaryPairMapper.selectL2ProcessList(effectiveZone, forceOverwrite, lastId, currentBatchSize);
             if (batch.isEmpty()) {
                 break;
             }
 
-            log.info("[Stage2-Reactive] 开始响应式高并发处理本批 {} 条模糊区记录 (并发通道上限={}, lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
-                    batch.size(), concurrency, lastId, forceOverwrite, totalProcessed.get(), targetLimit);
+            log.info("[Stage2-Reactive] 开始响应式高并发处理本批 {} 条 Pair 记录 (目标大区={}, 并发通道上限={}, lastId={}, forceOverwrite={}, 已完成 {}/{} 条)。",
+                    batch.size(), effectiveZone, concurrency, lastId, forceOverwrite, totalProcessed.get(), targetLimit);
 
             try {
                 Flux.fromIterable(batch)

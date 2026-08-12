@@ -60,18 +60,34 @@ public interface SessionBoundaryPairMapper {
     List<SessionBoundaryPairDO> selectPendingList(@Param("limit") int limit);
 
     /**
-     * 查询 Stage 2 待处理的 Pair 列表（支持游标分页、增量推导与全量覆盖重推导）
+     * 查询 Stage 2 待处理的 Pair 列表（支持大区筛选、游标分页、增量推导与全量覆盖重推导）
      *
-     * @param forceOverwrite 是否强行覆盖已有的 L2 裁决记录（true：抓取全量 FUZZY 区 Pair；false：仅抓取未裁决的 FUZZY 区 Pair）
+     * @param l1Zone         大区筛选（FUZZY / GREEN_MERGE / RED_SPLIT / ALL 或 null 表示全量）
+     * @param forceOverwrite 是否强行覆盖已有的 L2 裁决记录
      * @param lastId         上一批最后一条 Pair 的 ID（0L 表示从头开始）
      * @param limit          每批拉取的最大条数
      * @return 待推导的 Pair 列表
      */
     List<SessionBoundaryPairDO> selectL2ProcessList(
+            @Param("l1Zone") String l1Zone,
             @Param("forceOverwrite") boolean forceOverwrite,
             @Param("lastId") Long lastId,
             @Param("limit") int limit
     );
+
+    default List<SessionBoundaryPairDO> selectL2ProcessList(
+            boolean forceOverwrite,
+            Long lastId,
+            int limit) {
+        return selectL2ProcessList("ALL", forceOverwrite, lastId, limit);
+    }
+
+    /**
+     * 统计 L1 向量模型的裁决准确度及误合并/误切分混淆矩阵指标
+     *
+     * @return 包含 totalEvaluated, l1AccuracyRate, falseMergeCount, falseSplitCount 等指标的 Map
+     */
+    Map<String, Object> selectL1AccuracyStats();
 
     /**
      * 条件分页查询已完成 L2 大模型精排的 Pair 记录

@@ -123,7 +123,7 @@ public class SegmentationVisualizerController {
      * <p>支持选择文本与多模态模型名称，并支持强行覆盖重推导。</p>
      */
     @PostMapping("/run-stage2")
-    @Operation(summary = "触发 Stage 2 千问大模型精排裁决", description = "后台异步启动 Stage 2 任务，支持指定文本/多模态模型、是否覆盖重写已裁决记录以及定量上限限制")
+    @Operation(summary = "触发 Stage 2 千问大模型精排裁决", description = "后台异步启动 Stage 2 任务，支持指定大区、文本/多模态模型、是否覆盖重写已裁决记录以及定量上限限制")
     public ResponseEntity<Map<String, Object>> runStage2(
             @Parameter(description = "自定义纯文本模型（枚举名如 QWEN_TEXT_FLASH 或模型名如 qwen3.6-flash）", example = "QWEN_TEXT_FLASH")
             @RequestParam(required = false) final String textModel,
@@ -132,7 +132,9 @@ public class SegmentationVisualizerController {
             @Parameter(description = "是否强行覆盖重推导已有记录（true是/false否）", example = "false")
             @RequestParam(defaultValue = "false") final boolean forceOverwrite,
             @Parameter(description = "定量处理最大条数上限（0表示全量，例如指定100条）", example = "100")
-            @RequestParam(defaultValue = "0") final int maxCount) {
+            @RequestParam(defaultValue = "0") final int maxCount,
+            @Parameter(description = "指定推导大区（FUZZY / GREEN_MERGE / RED_SPLIT / ALL，默认 ALL 处理全量）", example = "ALL")
+            @RequestParam(required = false, defaultValue = "ALL") final String l1Zone) {
 
         if (l2TaskStatus.get() != null && Boolean.TRUE.equals(l2TaskStatus.get().getRunning())) {
             return ResponseEntity.status(409).body(Map.of(
@@ -155,11 +157,12 @@ public class SegmentationVisualizerController {
 
         CompletableFuture.runAsync(() -> {
             try {
-                log.info("[Controller] 开始异步触发 Stage 2 任务 | textModel: {}, omniModel: {}, forceOverwrite: {}, maxCount: {}",
+                log.info("[Controller] 开始异步触发 Stage 2 任务 | l1Zone: {}, textModel: {}, omniModel: {}, forceOverwrite: {}, maxCount: {}",
+                        l1Zone,
                         textEnum != null ? textEnum.getModelName() : "DEFAULT",
                         omniEnum != null ? omniEnum.getModelName() : "DEFAULT",
                         forceOverwrite, maxCount > 0 ? maxCount : "UNLIMITED");
-                final int processed = sessionBoundaryPipelineService.runStage2(textEnum, omniEnum, forceOverwrite, maxCount);
+                final int processed = sessionBoundaryPipelineService.runStage2(textEnum, omniEnum, forceOverwrite, maxCount, l1Zone);
                 log.info("[Controller] 异步 Stage 2 任务顺利完成，共精排 {} 条 Pair。", processed);
 
                 l2TaskStatus.set(com.chatgpt.memory.model.dto.L2TaskStatusDTO.builder()
@@ -195,7 +198,8 @@ public class SegmentationVisualizerController {
 
         return ResponseEntity.ok(Map.of(
                 "code", 200,
-                "message", String.format("L2 精排任务已异步启动！文本模型: %s，多模态模型: %s，强制覆盖模式: %s，目标上限: %s 条。",
+                "message", String.format("L2 精排任务已异步启动！推导大区: %s，文本模型: %s，多模态模型: %s，强制覆盖模式: %s，目标上限: %s 条。",
+                        l1Zone,
                         textEnum != null ? textEnum.getModelName() : qwenProperties.getTextModel() + "(默认)",
                         omniEnum != null ? omniEnum.getModelName() : qwenProperties.getMultimodalModel() + "(默认)",
                         forceOverwrite,
@@ -214,6 +218,20 @@ public class SegmentationVisualizerController {
                 "code", 200,
                 "message", "获取任务状态成功",
                 "status", status != null ? status : Map.of()
+        ));
+    }
+
+    /**
+     * 获取 L1 向量分析模型对比 L2 大模型精排的准确率与误杀/误判归因统计
+     */
+    @GetMapping("/l1-accuracy-stats")
+    @Operation(summary = "获取 L1 向量准确率与混淆矩阵评估指标", description = "对比已由 L2 大模型推导的数据，计算 L1 绿区与红区的分类准确率与误切分/误合并率")
+    public ResponseEntity<Map<String, Object>> getL1AccuracyStats() {
+        final Map<String, Object> stats = sessionBoundaryPairMapper.selectL1AccuracyStats();
+        return ResponseEntity.ok(Map.of(
+                "code", 200,
+                "message", "获取 L1 向量准确率指标成功",
+                "stats", stats != null ? stats : Map.of()
         ));
     }
 
