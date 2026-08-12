@@ -1123,6 +1123,7 @@
             try {
                 const res = await fetch(url);
                 const data = await res.json();
+                totalRecords = (data.code === 200 && data.total != null) ? data.total : 0;
 
                 if (data.code !== 200 || !data.list || data.list.length === 0) {
                     container.innerHTML = `
@@ -1134,7 +1135,6 @@
                     return;
                 }
 
-                totalRecords = data.total;
                 updatePagination(data.list.length);
 
                 let html = '';
