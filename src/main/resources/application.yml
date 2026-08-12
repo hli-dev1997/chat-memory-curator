@@ -44,7 +44,7 @@ chat:
       - assistant
 
 qwen:
-  text-model: qwen-long                   # 默认纯文本大语言模型 (阿里云 DashScope 平台全量 1,000,000 免费 Token 额度)
+  text-model: deepseek-r1-distill-qwen-7b # 默认纯文本大语言模型 (轻量 7B 小模型，阿里云 DashScope 平台全量 1,000,000 免费 Token 额度)
   multimodal-model: qwen3-omni-flash       # 默认全模态大模型 (阿里云 DashScope 平台全量 1,000,000 免费 Token 额度)
   base-url: https://ws-dzx3vakjj1wmjyha.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
   timeout-seconds: 60
