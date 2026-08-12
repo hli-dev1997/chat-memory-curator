@@ -75,6 +75,9 @@ public interface SessionBoundaryPairMapper {
             @Param("limit") int limit
     );
 
+    /**
+     * 查询 Stage 2 待处理的 Pair 列表（三参数默认重载方法，默认全量大区）
+     */
     default List<SessionBoundaryPairDO> selectL2ProcessList(
             boolean forceOverwrite,
             Long lastId,
@@ -90,12 +93,13 @@ public interface SessionBoundaryPairMapper {
     Map<String, Object> selectL1AccuracyStats();
 
     /**
-     * 条件分页查询已完成 L2 大模型精排的 Pair 记录
+     * 条件分页查询已完成 L2 大模型精排的 Pair 记录（支持大区过滤）
      *
      * @param hasAttachment  是否有附件（null 不限，1有图，0无图）
      * @param processStatus  处理状态（null 不限）
      * @param l2Verdict      L2 裁决结论（null 不限，MERGE / SPLIT）
      * @param l2Confidence   置信度（null 不限，HIGH / MEDIUM / LOW）
+     * @param l1Zone         L1 大区过滤（null 不限，FUZZY / GREEN_MERGE / RED_SPLIT）
      * @param keyword        关键词搜索（可为空）
      * @param offset         偏移量
      * @param limit          拉取条数
@@ -106,10 +110,25 @@ public interface SessionBoundaryPairMapper {
             @Param("processStatus") String processStatus,
             @Param("l2Verdict") String l2Verdict,
             @Param("l2Confidence") String l2Confidence,
+            @Param("l1Zone") String l1Zone,
             @Param("keyword") String keyword,
             @Param("offset") int offset,
             @Param("limit") int limit
     );
+
+    /**
+     * 条件分页查询已完成 L2 大模型精排的 Pair 记录（不限大区的兼容方法）
+     */
+    default List<SessionBoundaryPairDO> selectL2Records(
+            Integer hasAttachment,
+            String processStatus,
+            String l2Verdict,
+            String l2Confidence,
+            String keyword,
+            int offset,
+            int limit) {
+        return selectL2Records(hasAttachment, processStatus, l2Verdict, l2Confidence, null, keyword, offset, limit);
+    }
 
     /**
      * 统计匹配条件的 L2 裁决记录条数
@@ -119,8 +138,21 @@ public interface SessionBoundaryPairMapper {
             @Param("processStatus") String processStatus,
             @Param("l2Verdict") String l2Verdict,
             @Param("l2Confidence") String l2Confidence,
+            @Param("l1Zone") String l1Zone,
             @Param("keyword") String keyword
     );
+
+    /**
+     * 统计匹配条件的 L2 裁决记录条数（不限大区的兼容方法）
+     */
+    default int countL2Records(
+            Integer hasAttachment,
+            String processStatus,
+            String l2Verdict,
+            String l2Confidence,
+            String keyword) {
+        return countL2Records(hasAttachment, processStatus, l2Verdict, l2Confidence, null, keyword);
+    }
 
     /**
      * 统计 FUZZY 模糊区与 L2 待处理/已处理总指标看板数据

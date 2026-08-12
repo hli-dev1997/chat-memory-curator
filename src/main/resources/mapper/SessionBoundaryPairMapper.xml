@@ -249,6 +249,9 @@
         <if test="l2Confidence != null and l2Confidence != ''">
             AND `l2_confidence` = #{l2Confidence}
         </if>
+        <if test="l1Zone != null and l1Zone != ''">
+            AND `l1_zone` = #{l1Zone}
+        </if>
         <if test="keyword != null and keyword != ''">
             AND (
                 `parent_conversation_id` LIKE CONCAT('%', #{keyword}, '%')
@@ -277,6 +280,9 @@
         </if>
         <if test="l2Confidence != null and l2Confidence != ''">
             AND `l2_confidence` = #{l2Confidence}
+        </if>
+        <if test="l1Zone != null and l1Zone != ''">
+            AND `l1_zone` = #{l1Zone}
         </if>
         <if test="keyword != null and keyword != ''">
             AND (

@@ -546,7 +546,7 @@ public class SegmentationVisualizerController {
      * 条件分页获取 L2 大模型已审核落表记录列表
      */
     @GetMapping("/l2-records")
-    @Operation(summary = "条件分页获取 L2 大模型精排裁决落表记录列表", description = "支持按附件有无、处理状态、裁决结论、置信度及关键字过滤检索")
+    @Operation(summary = "条件分页获取 L2 大模型精排裁决落表记录列表", description = "支持按附件有无、处理状态、裁决结论、置信度、L1大区及关键字过滤检索")
     public ResponseEntity<Map<String, Object>> getL2Records(
             @RequestParam(defaultValue = "1") final int page,
             @RequestParam(defaultValue = "20") final int pageSize,
@@ -554,6 +554,7 @@ public class SegmentationVisualizerController {
             @RequestParam(required = false) final String processStatus,
             @RequestParam(required = false) final String l2Verdict,
             @RequestParam(required = false) final String l2Confidence,
+            @RequestParam(required = false) final String l1Zone,
             @RequestParam(required = false) final String keyword) {
 
         final int safePage = Math.max(1, page);
@@ -564,12 +565,13 @@ public class SegmentationVisualizerController {
         final String cleanStatus = (processStatus != null && !processStatus.trim().isEmpty()) ? processStatus.trim() : null;
         final String cleanVerdict = (l2Verdict != null && !l2Verdict.trim().isEmpty()) ? l2Verdict.trim() : null;
         final String cleanConfidence = (l2Confidence != null && !l2Confidence.trim().isEmpty()) ? l2Confidence.trim() : null;
+        final String cleanL1Zone = (l1Zone != null && !l1Zone.trim().isEmpty()) ? l1Zone.trim() : null;
 
         final List<SessionBoundaryPairDO> list = sessionBoundaryPairMapper.selectL2Records(
-                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanKeyword, offset, safePageSize
+                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanL1Zone, cleanKeyword, offset, safePageSize
         );
         final int total = sessionBoundaryPairMapper.countL2Records(
-                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanKeyword
+                hasAttachment, cleanStatus, cleanVerdict, cleanConfidence, cleanL1Zone, cleanKeyword
         );
 
         return ResponseEntity.ok(Map.of(

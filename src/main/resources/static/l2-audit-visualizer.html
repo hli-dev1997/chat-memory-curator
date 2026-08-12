@@ -767,6 +767,14 @@
                 <div class="stat-label"><i class="fa-solid fa-hourglass-half"></i> 剩余未精排数</div>
                 <div class="stat-value" id="statPending" style="color: #b45309;">-</div>
             </div>
+            <div class="stat-card" style="background: #fef2f2; border-color: #fecaca;">
+                <div class="stat-label"><i class="fa-solid fa-user-pen"></i> 已人工强改数</div>
+                <div class="stat-value" id="statManualOverride" style="color: #dc2626;">-</div>
+            </div>
+            <div class="stat-card" style="background: #f0fdf4; border-color: #bbf7d0;">
+                <div class="stat-label"><i class="fa-solid fa-bullseye"></i> L1 向量评估准确率</div>
+                <div class="stat-value" id="statL1Accuracy" style="color: #15803d;">-</div>
+            </div>
             <div class="stat-card">
                 <div class="stat-label"><i class="fa-solid fa-code-merge"></i> MERGE 强关联</div>
                 <div class="stat-value" id="statMerge" style="color: var(--merge-color);">-</div>
@@ -783,6 +791,17 @@
 
         <!-- 第二排控制按钮行 Control Actions Row -->
         <div class="control-row">
+            <!-- 大区选择控件 -->
+            <div class="control-group">
+                <span class="control-label"><i class="fa-solid fa-layer-group"></i> 推导目标大区:</span>
+                <select id="runL1Zone" class="number-input" style="width: 140px; height: 36px; padding: 0 8px;" onchange="updateButtonTexts()">
+                    <option value="FUZZY" selected>仅模糊区 (FUZZY)</option>
+                    <option value="ALL">全量大区 (ALL)</option>
+                    <option value="GREEN_MERGE">仅绿区 (GREEN_MERGE)</option>
+                    <option value="RED_SPLIT">仅红区 (RED_SPLIT)</option>
+                </select>
+            </div>
+
             <!-- 组 1：强制覆盖重跑前 N 条 -->
             <div class="control-group">
                 <span class="control-label"><i class="fa-solid fa-rotate-right"></i> 强行覆盖重跑:</span>
@@ -807,6 +826,16 @@
 
     <!-- 筛选过滤控制栏 Filter Bar -->
     <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">L1 大区：</span>
+            <select id="filterL1Zone" onchange="currentPage=1; loadRecords();">
+                <option value="">全部大区</option>
+                <option value="FUZZY">FUZZY 模糊区</option>
+                <option value="GREEN_MERGE">GREEN_MERGE 绿区</option>
+                <option value="RED_SPLIT">RED_SPLIT 红区</option>
+            </select>
+        </div>
+
         <div class="filter-group">
             <span class="filter-label">消息模态：</span>
             <select id="filterAtt" onchange="currentPage=1; loadRecords();">
@@ -983,7 +1012,7 @@
             return (size && size > 0) ? size : 15;
         }
 
-        // 1. 加载顶部看板统计指标
+        // 1. 加载顶部看板统计指标及 L1 向量准确率指标
         async function loadStats() {
             try {
                 const res = await fetch('/api/v1/segmentation-visualizer/l2-stats');
@@ -995,9 +1024,30 @@
                     document.getElementById('statFuzzyText').innerText = s.totalFuzzyText || s.TOTALFUZZYTEXT || 0;
                     document.getElementById('statJudged').innerText = s.totalJudged || s.TOTALJUDGED || 0;
                     document.getElementById('statPending').innerText = s.totalPending || s.TOTALPENDING || 0;
+                    document.getElementById('statManualOverride').innerText = s.totalManualOverride || s.TOTALMANUALOVERRIDE || 0;
                     document.getElementById('statMerge').innerText = s.totalMerge || s.TOTALMERGE || 0;
                     document.getElementById('statSplit').innerText = s.totalSplit || s.TOTALSPLIT || 0;
                     document.getElementById('statReview').innerText = s.totalReview || s.TOTALREVIEW || 0;
+                }
+
+                // 读取 L1 向量准确率对比指标
+                const accRes = await fetch('/api/v1/segmentation-visualizer/l1-accuracy-stats');
+                const accJson = await accRes.json();
+                if (accJson.code === 200 && accJson.stats) {
+                    const st = accJson.stats;
+                    const totalEval = parseInt(st.totalEvaluated || st.TOTALEVALUATED || 0, 10);
+                    const trueM = parseInt(st.trueMerge || st.TRUEMERGE || 0, 10);
+                    const trueS = parseInt(st.trueSplit || st.TRUESPLIT || 0, 10);
+                    const falseM = parseInt(st.falseMerge || st.FALSEMERGE || 0, 10);
+                    const falseS = parseInt(st.falseSplit || st.FALSESPLIT || 0, 10);
+
+                    const nonFuzzyTotal = trueM + trueS + falseM + falseS;
+                    if (nonFuzzyTotal > 0) {
+                        const accRate = ((trueM + trueS) / nonFuzzyTotal * 100).toFixed(1);
+                        document.getElementById('statL1Accuracy').innerText = `${accRate}% (${trueM + trueS}/${nonFuzzyTotal})`;
+                    } else {
+                        document.getElementById('statL1Accuracy').innerText = totalEval > 0 ? '全量模糊区' : '待评估';
+                    }
                 }
             } catch (err) {
                 console.error('加载看板统计数据失败:', err);
@@ -1009,6 +1059,7 @@
             const container = document.getElementById('recordsContainer');
             container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>正在读取 L2 裁决落表记录...</p></div>';
 
+            const l1Zone = document.getElementById('filterL1Zone').value;
             const att = document.getElementById('filterAtt').value;
             const verdict = document.getElementById('filterVerdict').value;
             const confidence = document.getElementById('filterConfidence').value;
@@ -1017,6 +1068,7 @@
             const currentSize = getPageSize();
 
             let url = `/api/v1/segmentation-visualizer/l2-records?page=${currentPage}&pageSize=${currentSize}`;
+            if (l1Zone) url += `&l1Zone=${l1Zone}`;
             if (att) url += `&hasAttachment=${att}`;
             if (verdict) url += `&l2Verdict=${verdict}`;
             if (confidence) url += `&l2Confidence=${confidence}`;
@@ -1079,6 +1131,7 @@
             const renderedTextB = marked.parse(item.messageBText || '');
 
             const formattedUpdateTime = item.updateTime ? item.updateTime.replace('T', ' ') : '-';
+            const zoneName = item.l1Zone || 'FUZZY';
 
             return `
             <div class="record-card" id="pair-card-${item.id}">
@@ -1087,6 +1140,7 @@
                         <span class="pair-badge">Pair #${item.pairIndex} (ID: ${item.id})</span>
                         <span class="conv-id" title="Session / Conversation ID"><i class="fa-solid fa-hashtag"></i> ${item.parentConversationId}</span>
                         <span class="model-badge"><i class="fa-solid fa-robot"></i> ${modelName}</span>
+                        <span class="model-badge" style="background: var(--bg-subtle); color: var(--text-muted);"><i class="fa-solid fa-layer-group"></i> L1:${zoneName}</span>
                         ${isOmni ? '<span class="att-badge"><i class="fa-solid fa-image"></i> 多模态图文</span>' : ''}
                         <span class="badge ${statusClass}">${statusText}</span>
                     </div>
@@ -1098,46 +1152,45 @@
                 </div>
 
                 <!-- L2 模型判决理由框 -->
-                <div class="reasoning-box">
-                    <i class="fa-solid fa-quote-left"></i>
-                    <div>
-                        <strong>AI 裁决依据：</strong> ${item.l2Reason || '暂无说明'}
+                <div class="reason-box">
+                    <div class="reason-title"><i class="fa-solid fa-brain"></i> AI 裁决依据:</div>
+                    <div class="reason-content">${item.l2Reason || '无'}</div>
+                </div>
+
+                <!-- 消息对比 Block -->
+                <div class="pair-comparison-grid">
+                    <div class="chunk-box chunk-a">
+                        <div class="chunk-header">
+                            <span class="chunk-title"><i class="fa-solid fa-message"></i> CHUNK A (消息 #${item.pairIndex})</span>
+                            <span class="role-badge">角色: ${item.messageARole || 'N/A'}</span>
+                        </div>
+                        <div class="chunk-body markdown-body">${renderedTextA}</div>
+                    </div>
+
+                    <div class="chunk-box chunk-b">
+                        <div class="chunk-header">
+                            <span class="chunk-title"><i class="fa-solid fa-reply"></i> CHUNK B (消息 #${item.pairIndex + 1})</span>
+                            <span class="role-badge">角色: ${item.messageBRole || 'N/A'}</span>
+                        </div>
+                        <div class="chunk-body markdown-body">${renderedTextB}</div>
                     </div>
                 </div>
 
-                <!-- Chunk A 与 Chunk B 对比 -->
-                <div class="chunks-comparison">
-                    <div class="chunk-card">
-                        <div class="chunk-header">
-                            <span><i class="fa-solid fa-message"></i> Chunk A (消息 #${item.pairIndex})</span>
-                            <span>角色: ${item.messageARole || 'user'}</span>
-                        </div>
-                        <div class="chunk-body">${renderedTextA}</div>
-                    </div>
-
-                    <div class="chunk-card">
-                        <div class="chunk-header">
-                            <span><i class="fa-solid fa-reply"></i> Chunk B (消息 #${item.pairIndex + 1})</span>
-                            <span>角色: ${item.messageBRole || 'assistant'}</span>
-                        </div>
-                        <div class="chunk-body">${renderedTextB}</div>
-                    </div>
-                </div>
-
-                <!-- 卡片底部 -->
+                <!-- 底部操作与关联属性工具栏 -->
                 <div class="card-footer">
-                    <div>
-                        <span>L1 向量得分: <strong>${item.l1Score || '-'}</strong> (${item.l1Zone || '-'})</span>
-                        <span style="margin-left: 12px;">更新时间: ${formattedUpdateTime}</span>
+                    <div class="footer-meta">
+                        <span>L1 向量得分: <strong>${item.l1Score != null ? item.l1Score : 'N/A'}</strong> (${zoneName})</span>
+                        <span>更新时间: ${formattedUpdateTime}</span>
                     </div>
-                    <div class="audit-btn-group">
-                        <button class="btn btn-sm btn-pass" onclick="submitAudit(${item.id}, 'PASSED', '${item.l2Verdict || 'MERGE'}')">
-                            <i class="fa-solid fa-check"></i> 认可决议
+
+                    <div class="action-buttons">
+                        <button class="btn btn-outline btn-sm" onclick="submitAudit(${item.id}, 'MANUAL_OVERRIDE', '${item.l2Verdict || 'MERGE'}')">
+                            <i class="fa-solid fa-check"></i> 认可裁决
                         </button>
-                        <button class="btn btn-sm btn-override-merge" onclick="submitAudit(${item.id}, 'OVERRIDDEN', 'MERGE')">
+                        <button class="btn btn-warning btn-sm" onclick="submitAudit(${item.id}, 'MANUAL_OVERRIDE', 'MERGE')">
                             <i class="fa-solid fa-code-merge"></i> 强改 MERGE
                         </button>
-                        <button class="btn btn-sm btn-override-split" onclick="submitAudit(${item.id}, 'OVERRIDDEN', 'SPLIT')">
+                        <button class="btn btn-danger btn-sm" onclick="submitAudit(${item.id}, 'MANUAL_OVERRIDE', 'SPLIT')">
                             <i class="fa-solid fa-scissors"></i> 强改 SPLIT
                         </button>
                     </div>
@@ -1341,8 +1394,19 @@
             const countInputId = forceOverwrite ? 'overwriteCount' : 'resumeCount';
             const countVal = document.getElementById(countInputId).value || '100';
             const maxCount = parseInt(countVal, 10);
+            const l1Zone = document.getElementById('runL1Zone').value || 'FUZZY';
 
-            const modeText = forceOverwrite ? `【强行覆盖推导前 ${maxCount} 条】` : `【增量接着推导剩余 ${maxCount > 0 ? maxCount : '全量'} 条未审记录】`;
+            const zoneLabelMap = {
+                'ALL': '全量大区',
+                'FUZZY': '仅模糊区',
+                'GREEN_MERGE': '仅绿区合并校验',
+                'RED_SPLIT': '仅红区切断校验'
+            };
+            const zoneLabel = zoneLabelMap[l1Zone] || l1Zone;
+
+            const modeText = forceOverwrite
+                ? `【强行覆盖推导 (${zoneLabel}) 前 ${maxCount} 条】`
+                : `【增量接着推导 (${zoneLabel}) 剩余 ${maxCount > 0 ? maxCount : '全量'} 条未审记录】`;
             
             const confirmed = await showCustomConfirm('启动任务确认', `确认要启动 L2 大模型推导 ${modeText} 吗？`, '确认启动');
             if (!confirmed) {
@@ -1354,6 +1418,7 @@
                 const formData = new FormData();
                 formData.append('forceOverwrite', forceOverwrite ? 'true' : 'false');
                 formData.append('maxCount', maxCount.toString());
+                formData.append('l1Zone', l1Zone);
 
                 const res = await fetch('/api/v1/segmentation-visualizer/run-stage2', {
                     method: 'POST',
