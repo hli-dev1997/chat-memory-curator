@@ -41,7 +41,7 @@ public enum LlmModelEnum {
     QWEN_VL_OCR_1028("qwen-vl-ocr-1028", ModelTypeEnum.TEXT, "qwen-vl-ocr-1028 (1,000,000 免费额度)", false),
     QWEN3_VL_FLASH_2025_10_15("qwen3-vl-flash-2025-10-15", ModelTypeEnum.TEXT, "qwen3-vl-flash-2025-10-15 (1,000,000 免费额度)", false),
     QWEN3_MAX_PREVIEW("qwen3-max-preview", ModelTypeEnum.TEXT, "qwen3-max-preview (1,000,000 免费额度)", false),
-    QWEN3_8B("qwen3-8b", ModelTypeEnum.TEXT, "qwen3-8b (1,000,000 免费额度)", false),
+    QWEN3_8B("qwen3-8b", ModelTypeEnum.TEXT, "qwen3-8b (免费额度已用尽)", true),
     QWEN_PLUS_0112("qwen-plus-0112", ModelTypeEnum.TEXT, "qwen-plus-0112 (1,000,000 免费额度)", false),
     QWEN_PLUS("qwen-plus", ModelTypeEnum.TEXT, "qwen-plus (免费额度已用尽)", true),
     GUI_PLUS("gui-plus", ModelTypeEnum.TEXT, "gui-plus (1,000,000 免费额度)", false),
