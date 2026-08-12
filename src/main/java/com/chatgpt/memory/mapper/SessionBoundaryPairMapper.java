@@ -155,11 +155,19 @@ public interface SessionBoundaryPairMapper {
     }
 
     /**
-     * 统计 FUZZY 模糊区与 L2 待处理/已处理总指标看板数据
+     * 统计指定大区或全量大区下 L2 待处理/已处理总指标看板数据
      *
+     * @param l1Zone L1 大区筛选（FUZZY / GREEN_MERGE / RED_SPLIT / ALL 或 null）
      * @return 包含 totalFuzzy, totalFuzzyImages, totalFuzzyText, totalJudged, totalPending, totalMerge, totalSplit, totalReview 的 Map
      */
-    Map<String, Object> selectL2SummaryStats();
+    Map<String, Object> selectL2SummaryStats(@Param("l1Zone") String l1Zone);
+
+    /**
+     * 统计全量/默认模糊区下 L2 待处理/已处理总指标看板数据（默认兼容方法）
+     */
+    default Map<String, Object> selectL2SummaryStats() {
+        return selectL2SummaryStats(null);
+    }
 
     /**
      * 回填 L2 裁决结果（Stage 2 裁决完成后更新）

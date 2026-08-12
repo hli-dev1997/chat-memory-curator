@@ -748,7 +748,7 @@
         <!-- 统计卡片面板 第一排看板 Dashboard -->
         <div class="stats-grid">
             <div class="stat-card" style="background: #fffbeb; border-color: #fde68a;">
-                <div class="stat-label"><i class="fa-solid fa-database"></i> 模糊区总条数</div>
+                <div class="stat-label" id="statTotalFuzzyLabel"><i class="fa-solid fa-database"></i> 模糊区总条数</div>
                 <div class="stat-value" id="statTotalFuzzy" style="color: #92400e;">-</div>
             </div>
             <div class="stat-card">
@@ -794,7 +794,7 @@
             <!-- 大区选择控件 -->
             <div class="control-group">
                 <span class="control-label"><i class="fa-solid fa-layer-group"></i> 推导目标大区:</span>
-                <select id="runL1Zone" class="number-input" style="width: 140px; height: 36px; padding: 0 8px;" onchange="updateButtonTexts()">
+                <select id="runL1Zone" class="number-input" style="width: 180px; height: 36px; padding: 0 8px; font-weight: 600;" onchange="onRunZoneChange()">
                     <option value="FUZZY" selected>仅模糊区 (FUZZY)</option>
                     <option value="ALL">全量大区 (ALL)</option>
                     <option value="GREEN_MERGE">仅绿区 (GREEN_MERGE)</option>
@@ -808,7 +808,7 @@
                 <input type="number" id="overwriteCount" class="number-input" value="100" min="1" max="10000" placeholder="处理条数" oninput="updateButtonTexts()">
                 <span class="control-label" style="font-weight: 500; color: var(--text-muted);">条</span>
                 <button class="btn btn-warning" onclick="triggerRunStage2(true)">
-                    <i class="fa-solid fa-bolt"></i> ⚡ 强行覆盖推导前 <span id="overwriteBtnNum">100</span> 条
+                    <i class="fa-solid fa-bolt"></i> ⚡ 强行覆盖 [<span id="overwriteBtnZone">仅模糊区</span>] 前 <span id="overwriteBtnNum">100</span> 条
                 </button>
             </div>
 
@@ -818,7 +818,7 @@
                 <input type="number" id="resumeCount" class="number-input" value="100" min="0" max="10000" placeholder="0为全量" oninput="updateButtonTexts()">
                 <span class="control-label" style="font-weight: 500; color: var(--text-muted);">条</span>
                 <button class="btn btn-primary" onclick="triggerRunStage2(false)">
-                    <i class="fa-solid fa-circle-play"></i> ▶ 接着推导剩余 <span id="resumeBtnNum">100</span> 条未审记录
+                    <i class="fa-solid fa-circle-play"></i> ▶ 接着推导 [<span id="resumeBtnZone">仅模糊区</span>] 剩余 <span id="resumeBtnNum">100</span> 条
                 </button>
             </div>
         </div>
@@ -991,18 +991,46 @@
             }
         }
 
-        // 动态同步输入框条数到按钮文字中
+        // 动态同步输入框条数与大区到按钮文字中
         function updateButtonTexts() {
             const overwriteVal = document.getElementById('overwriteCount').value;
             const resumeVal = document.getElementById('resumeCount').value;
+            const l1Zone = document.getElementById('runL1Zone').value || 'FUZZY';
+
+            const zoneLabelMap = {
+                'ALL': '全量大区',
+                'FUZZY': '仅模糊区',
+                'GREEN_MERGE': '仅绿区',
+                'RED_SPLIT': '仅红区'
+            };
+            const zoneText = zoneLabelMap[l1Zone] || l1Zone;
 
             document.getElementById('overwriteBtnNum').innerText = (overwriteVal && overwriteVal.trim() !== '') ? overwriteVal : '0';
+            document.getElementById('overwriteBtnZone').innerText = zoneText;
 
             if (resumeVal === '0' || !resumeVal || resumeVal.trim() === '') {
                 document.getElementById('resumeBtnNum').innerText = '全量';
             } else {
                 document.getElementById('resumeBtnNum').innerText = resumeVal;
             }
+            document.getElementById('resumeBtnZone').innerText = zoneText;
+        }
+
+        // 当“推导目标大区”改变时，触发按钮文字更新、看板数据重载及列表过滤同步
+        function onRunZoneChange() {
+            updateButtonTexts();
+            const l1Zone = document.getElementById('runL1Zone').value || 'FUZZY';
+            
+            // 同步修改下方列表筛选框中的大区（如果非 ALL 则同步，全量时切为全部）
+            const filterEl = document.getElementById('filterL1Zone');
+            if (filterEl) {
+                filterEl.value = (l1Zone === 'ALL') ? '' : l1Zone;
+            }
+
+            // 重载顶部看板数据（带上选中的大区参数）与底部列表
+            loadStats();
+            currentPage = 1;
+            loadRecords();
         }
 
         // 获取当前用户设置或保持的每页条数
@@ -1015,7 +1043,24 @@
         // 1. 加载顶部看板统计指标及 L1 向量准确率指标
         async function loadStats() {
             try {
-                const res = await fetch('/api/v1/segmentation-visualizer/l2-stats');
+                const l1Zone = document.getElementById('runL1Zone').value || 'FUZZY';
+                let statsUrl = '/api/v1/segmentation-visualizer/l2-stats';
+                if (l1Zone) {
+                    statsUrl += `?l1Zone=${l1Zone}`;
+                }
+
+                const labelMap = {
+                    'ALL': '<i class="fa-solid fa-database"></i> 全量大区总条数',
+                    'FUZZY': '<i class="fa-solid fa-database"></i> 模糊区总条数',
+                    'GREEN_MERGE': '<i class="fa-solid fa-database"></i> 绿区合并总条数',
+                    'RED_SPLIT': '<i class="fa-solid fa-database"></i> 红区切断总条数'
+                };
+                const labelEl = document.getElementById('statTotalFuzzyLabel');
+                if (labelEl) {
+                    labelEl.innerHTML = labelMap[l1Zone] || '<i class="fa-solid fa-database"></i> 大区总条数';
+                }
+
+                const res = await fetch(statsUrl);
                 const json = await res.json();
                 if (json.code === 200 && json.stats) {
                     const s = json.stats;

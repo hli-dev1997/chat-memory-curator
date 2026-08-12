@@ -294,7 +294,7 @@
         </if>
     </select>
 
-    <!-- 统计 FUZZY 模糊区与 L2 待处理/已处理全维度指标看板数据 -->
+    <!-- 统计指定大区或全量大区下 L2 待处理/已处理全维度指标看板数据 -->
     <select id="selectL2SummaryStats" resultType="map">
         SELECT
             COUNT(1) AS totalFuzzy,
@@ -307,7 +307,11 @@
             SUM(CASE WHEN `process_status` = 'NEED_MANUAL_REVIEW' THEN 1 ELSE 0 END) AS totalReview,
             SUM(CASE WHEN `process_status` = 'MANUAL_OVERRIDE' THEN 1 ELSE 0 END) AS totalManualOverride
         FROM `session_boundary_pair`
-        WHERE `l1_zone` = 'FUZZY'
+        <where>
+            <if test="l1Zone != null and l1Zone != '' and l1Zone != 'ALL'">
+                AND `l1_zone` = #{l1Zone}
+            </if>
+        </where>
     </select>
 
     <!-- 统计 L1 向量模型对比 L2 大模型裁决的准确度及误判归因 -->

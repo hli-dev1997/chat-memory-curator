@@ -585,12 +585,14 @@ public class SegmentationVisualizerController {
     }
 
     /**
-     * 获取 L2 大模型裁决统计指标看板数据
+     * 获取 L2 大模型裁决统计指标看板数据（支持按大区统计）
      */
     @GetMapping("/l2-stats")
-    @Operation(summary = "获取 L2 大模型精排裁决统计指标看板", description = "提供 FUZZY 模糊区总数、多模态图文数、纯文本数、已精排数、剩余未处理数、MERGE/SPLIT 与待复核数")
-    public ResponseEntity<Map<String, Object>> getL2Stats() {
-        final Map<String, Object> stats = sessionBoundaryPairMapper.selectL2SummaryStats();
+    @Operation(summary = "获取 L2 大模型精排裁决统计指标看板", description = "提供指定大区或全量 Pair 总数、多模态图文数、纯文本数、已精排数、剩余未处理数、MERGE/SPLIT 与待复核数")
+    public ResponseEntity<Map<String, Object>> getL2Stats(
+            @RequestParam(required = false) final String l1Zone) {
+        final String cleanL1Zone = (l1Zone != null && !l1Zone.trim().isEmpty()) ? l1Zone.trim() : null;
+        final Map<String, Object> stats = sessionBoundaryPairMapper.selectL2SummaryStats(cleanL1Zone);
         return ResponseEntity.ok(Map.of(
                 "code", 200,
                 "message", "获取成功",
