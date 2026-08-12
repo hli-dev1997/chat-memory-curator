@@ -43,7 +43,7 @@ public enum LlmModelEnum {
     QWEN3_MAX_PREVIEW("qwen3-max-preview", ModelTypeEnum.TEXT, "qwen3-max-preview (1,000,000 免费额度)", false),
     QWEN3_8B("qwen3-8b", ModelTypeEnum.TEXT, "qwen3-8b (1,000,000 免费额度)", false),
     QWEN_PLUS_0112("qwen-plus-0112", ModelTypeEnum.TEXT, "qwen-plus-0112 (1,000,000 免费额度)", false),
-    QWEN_PLUS("qwen-plus", ModelTypeEnum.TEXT, "qwen-plus (1,000,000 免费额度)", false),
+    QWEN_PLUS("qwen-plus", ModelTypeEnum.TEXT, "qwen-plus (免费额度已用尽)", true),
     GUI_PLUS("gui-plus", ModelTypeEnum.TEXT, "gui-plus (1,000,000 免费额度)", false),
     QWEN_MATH_PLUS("qwen-math-plus", ModelTypeEnum.TEXT, "qwen-math-plus (1,000,000 免费额度)", false),
     QWEN_TURBO("qwen-turbo", ModelTypeEnum.TEXT, "qwen-turbo (1,000,000 免费额度)", false),
