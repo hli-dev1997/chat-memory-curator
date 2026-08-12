@@ -22,7 +22,7 @@ public enum LlmModelEnum {
     QWEN_PLUS_2025_07_28("qwen-plus-2025-07-28", ModelTypeEnum.TEXT, "qwen-plus-2025-07-28 (1,000,000 免费额度)", false),
     DEEPSEEK_R1_DISTILL_QWEN_7B("deepseek-r1-distill-qwen-7b", ModelTypeEnum.TEXT, "deepseek-r1-distill-qwen-7b (1,000,000 免费额度)", false),
     GLM_5("glm-5", ModelTypeEnum.TEXT, "glm-5 (1,000,000 免费额度)", false),
-    QWEN_MAX("qwen-max", ModelTypeEnum.TEXT, "qwen-max (1,000,000 免费额度)", false),
+    QWEN_MAX("qwen-max", ModelTypeEnum.TEXT, "qwen-max (免费额度已用尽)", true),
     QWEN_MT_FLASH("qwen-mt-flash", ModelTypeEnum.TEXT, "qwen-mt-flash (1,000,000 免费额度)", false),
     QWEN3_VL_30B_A3B_THINKING("qwen3-vl-30b-a3b-thinking", ModelTypeEnum.TEXT, "qwen3-vl-30b-a3b-thinking (1,000,000 免费额度)", false),
     QWEN_VL_OCR_LATEST("qwen-vl-ocr-latest", ModelTypeEnum.TEXT, "qwen-vl-ocr-latest (1,000,000 免费额度)", false),
