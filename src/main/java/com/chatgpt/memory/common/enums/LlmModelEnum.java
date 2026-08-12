@@ -46,7 +46,7 @@ public enum LlmModelEnum {
     QWEN_PLUS("qwen-plus", ModelTypeEnum.TEXT, "qwen-plus (免费额度已用尽)", true),
     GUI_PLUS("gui-plus", ModelTypeEnum.TEXT, "gui-plus (1,000,000 免费额度)", false),
     QWEN_MATH_PLUS("qwen-math-plus", ModelTypeEnum.TEXT, "qwen-math-plus (1,000,000 免费额度)", false),
-    QWEN_TURBO("qwen-turbo", ModelTypeEnum.TEXT, "qwen-turbo (1,000,000 免费额度)", false),
+    QWEN_TURBO("qwen-turbo", ModelTypeEnum.TEXT, "qwen-turbo (免费额度已用尽)", true),
     // #endregion
 
     // #region 全模态大模型 - 具备免费额度
